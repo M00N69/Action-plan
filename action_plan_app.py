@@ -41,7 +41,7 @@ def load_document_from_github(url):
 def load_action_plan(uploaded_file):
     """Load the user-uploaded action plan."""
     if uploaded_file is not None:
-        action_plan_df = pd.read_excel(uploaded_file, header=11)  # header=11 to skip the first 11 rows
+        action_plan_df = pd.read_excel(uploaded_file, header=12)  # header=11 to skip the first 11 rows
         return action_plan_df
     return None
 
