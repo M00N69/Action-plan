@@ -4,8 +4,8 @@ import requests
 import google.generativeai as genai
 
 # Load VISIPACT data and IFS checklist from GitHub
-visipact_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/output%20vsipact.csv")
-ifs_checklist_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
+visipact_df = pd.read_csv("https://raw.githubusercontent.com/your-username/your-repo-name/main/data/output%20vsipact.csv")
+ifs_checklist_df = pd.read_csv("https://raw.githubusercontent.com/your-username/your-repo-name/main/ifs/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
 
 # Function to load the user-uploaded action plan
 def load_action_plan(uploaded_file):
@@ -33,7 +33,7 @@ def configure_model(api_key, document_text):
         {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
     ]
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
+        model_name="gemini-pro",  # Choose the Gemini model you want to use
         generation_config=generation_config,
         system_instruction=document_text,
         safety_settings=safety_settings
@@ -54,8 +54,10 @@ def load_document_from_github(url):
 def get_ai_recommendations(non_conformity_text, requirement_number, visipact_df, ifs_checklist_df, model):
     # 1. Create a prompt for GenAI
     prompt = f"""
-    J'ai un plan d'action IFS Food 8.
-    Une non-conformité a été trouvée pour cette exigence: {ifs_checklist_df.loc[ifs_checklist_df["NUM_REQ"] == requirement_number, "IFS Requirements"].values[0]}
+    Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
+    Une non-conformité a été trouvée pour l'exigence suivante:
+    {ifs_checklist_df.loc[ifs_checklist_df["NUM_REQ"] == requirement_number, "IFS Requirements"].values[0]}
+    
     La description de la non-conformité est: {non_conformity_text}
 
     Veuillez fournir:
@@ -63,23 +65,23 @@ def get_ai_recommendations(non_conformity_text, requirement_number, visipact_df,
     2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
     3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
 
-    Voici quelques données historiques de VISIPACT: {visipact_df.to_string()} 
+    Voici quelques données historiques de VISIPACT:
+    {visipact_df[["NomUnite", "CONSTATSDAUDIT", "ACTIONFOURNISSEUR"]].to_string()}
+    
+    N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
     """
 
-    # 2. Call the GenAI API
-    response = model.predict(prompt=prompt)
+    # 2. Start a chat with GenAI
+    convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
 
-    # 3. Extract recommendations from GenAI's response
-    corrective_actions = response["content"] 
-    
-    # 4. Find relevant IFS evidence
-    evidence = ifs_checklist_df.loc[ifs_checklist_df["NUM_REQ"] == requirement_number, "IFS Requirements"].values[0]
-    # You can also use other columns of the ifs_checklist_df for more specific evidence
-    
-    # ... (You may need to further process the extracted evidence from GenAI)
-    
-    # 5. Extract suggested deadlines (adapt based on GenAI's response)
-    suggested_deadlines = " "  #  
+    # 3. Get the GenAI response
+    response = convo.send_message(prompt) 
+
+    # 4. Extract recommendations from GenAI's response
+    # (You may need to adjust this based on how GenAI formats its response)
+    corrective_actions = response.text
+    evidence = " "  
+    suggested_deadlines = " "  
 
     recommendations = {
         "corrective_actions": corrective_actions,
@@ -90,7 +92,6 @@ def get_ai_recommendations(non_conformity_text, requirement_number, visipact_df,
     }
 
     return recommendations
-
 
 # Function to generate a Streamlit table with recommendations
 def generate_table(recommendations):
@@ -124,22 +125,37 @@ def main():
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
             st.dataframe(action_plan_df)
+            
+            # Create a DataFrame for recommendations
+            recommendations_df = pd.DataFrame(columns=["requirementNo", "requirementText", "requirementScore", "requirementExplanation", "correctionDescription", "correctionResponsibility", "correctionDueDate", "correctionStatus", "correctionEvidence", "correctiveActionDescription", "correctiveActionResponsibility", "correctiveActionDueDate", "correctiveActionStatus", "releaseResponsibility", "releaseDate"])
 
+            # Get recommendations for each non-conformity
+            for index, row in action_plan_df.iterrows():
+                non_conformity_text = row["requirementExplanation"]
+                requirement_number = row["requirementNo"]
+                
+                # Load the document from GitHub
+                url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
+                document_text = load_document_from_github(url)
+
+                if document_text:
+                    api_key = st.secrets["api_key"]
+                    model = configure_model(api_key, document_text)
+
+                    recommendations = get_ai_recommendations(non_conformity_text, requirement_number, visipact_df, ifs_checklist_df, model)
+                    recommendations_df = pd.concat([recommendations_df, pd.DataFrame([recommendations])], ignore_index=True)
+                    
+            # Display the recommendations
+            st.subheader("Recommandations de l'IA")
+            generate_table(recommendations_df)
+                
     non_conformity_text = st.text_input("Entrez la description de la non-conformité")
     requirement_number = st.selectbox("Sélectionnez le numéro d'exigence", list(ifs_checklist_df["NUM_REQ"].values))
 
-    # Load the document from GitHub
-    url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
-    document_text = load_document_from_github(url)
-
-    if document_text:
-        api_key = st.secrets["api_key"]
-        model = configure_model(api_key, document_text)
-
-        if st.button("Obtenir des Recommandations de l'IA"):
-            recommendations = get_ai_recommendations(non_conformity_text, requirement_number, visipact_df, ifs_checklist_df, model)
-            st.subheader("Recommandations de l'IA")
-            generate_table(recommendations)
+    if st.button("Obtenir des Recommandations de l'IA"):
+        recommendations = get_ai_recommendations(non_conformity_text, requirement_number, visipact_df, ifs_checklist_df, model)
+        st.subheader("Recommandations de l'IA")
+        generate_table(recommendations)
 
 if __name__ == "__main__":
     main()
