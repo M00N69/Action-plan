@@ -12,7 +12,7 @@ def load_action_plan(uploaded_file):
     if uploaded_file is not None:
         if uploaded_file.name.endswith(".xlsx"):
             # Skip the first 11 rows and use the 12th row as the header
-            action_plan_df = pd.read_excel(uploaded_file, header=12) 
+            action_plan_df = pd.read_excel(uploaded_file, header=11)
         else:
             st.error("Type de fichier incorrect. Veuillez télécharger un fichier Excel.")
             action_plan_df = None
@@ -52,62 +52,73 @@ def load_document_from_github(url):
         return None
 
 # Function to generate AI recommendations using GenAI
-def get_ai_recommendations(non_conformity_text, requirement_number, visipact_df, ifs_checklist_df, model):
-    # 1. Create a prompt for GenAI
-    prompt = f"""
-    Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
-    Une non-conformité a été trouvée pour l'exigence suivante:
-    {ifs_checklist_df.loc[ifs_checklist_df["NUM_REQ"] == requirement_number, "IFS Requirements"].values[0]}
+def get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model):
+    recommendations = []
     
-    La description de la non-conformité est: {non_conformity_text}
+    for index, row in action_plan_df.iterrows():
+        non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+        requirement_number = row["Numéro d'exigence"]
+        requirement_text = row["Exigence IFS Food 8"]
+        requirement_score = row["Notation"]
 
-    Veuillez fournir:
-    1. Une correction proposée basée sur les données historiques de VISIPACT.
-    2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
-    3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
+        # Create a prompt for GenAI
+        prompt = f"""
+        Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
+        J'ai un plan d'action IFS Food 8.
+        Une non-conformité a été trouvée pour l'exigence suivante:
+        {requirement_text}
+        
+        La description de la non-conformité est: {non_conformity_text}
 
-    Voici quelques données historiques de VISIPACT:
-    {visipact_df[["NomUnite", "CONSTATSDAUDIT", "ACTIONFOURNISSEUR"]].to_string()}
-    
-    N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
-    """
+        Veuillez fournir:
+        1. Une correction proposée basée sur les données historiques de VISIPACT.
+        2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
+        3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
 
-    # 2. Start a chat with GenAI
-    convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
+        Voici quelques données historiques de VISIPACT:
+        {visipact_df[["NomUnite", "CONSTATSDAUDIT", "ACTIONFOURNISSEUR"]].to_string()}
+        
+        N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
+        """
 
-    # 3. Get the GenAI response
-    response = convo.send_message(prompt) 
+        # Start a chat with GenAI
+        convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
 
-    # 4. Extract recommendations from GenAI's response
-    # (You may need to adjust this based on how GenAI formats its response)
-    corrective_actions = response.text
-    evidence = " "  
-    suggested_deadlines = " "  
+        # Get the GenAI response
+        response = convo.send_message(prompt) 
 
-    recommendations = {
-        "corrective_actions": corrective_actions,
-        "evidence": evidence,
-        "suggested_deadlines": suggested_deadlines,
-        "requirement_number": requirement_number,
-        "non_conformity_text": non_conformity_text
-    }
+        # Extract recommendations from GenAI's response
+        corrective_actions = response.text
+        evidence = " " 
+        suggested_deadlines = " "  
+
+        recommendations.append({
+            "requirementNo": requirement_number,
+            "requirementText": requirement_text,
+            "requirementScore": requirement_score,
+            "requirementExplanation": non_conformity_text,
+            "correctionDescription": " ",
+            "correctionResponsibility": " ",
+            "correctionDueDate": " ",
+            "correctionStatus": " ",
+            "correctionEvidence": " ",
+            "correctiveActionDescription": corrective_actions,
+            "correctiveActionResponsibility": " ",
+            "correctiveActionDueDate": " ",
+            "correctiveActionStatus": " ",
+            "releaseResponsibility": " ",
+            "releaseDate": " ",
+        })
 
     return recommendations
 
-
 # Function to generate a Streamlit table with recommendations
 def generate_table(recommendations):
-    table_data = {
-        "Numéro d'Exigence": [recommendations["requirement_number"]],
-        "Non-Conformité": [recommendations["non_conformity_text"]],
-        "Action Corrective": [recommendations["corrective_actions"]],
-        "Preuve": [recommendations["evidence"]],
-        "Echéance Suggérée": [recommendations["suggested_deadlines"]]
-    }
-    st.dataframe(pd.DataFrame(table_data))
+    recommendations_df = pd.DataFrame(recommendations)
+    st.dataframe(recommendations_df)
 
     # Allow user to download the table
-    csv = pd.DataFrame(table_data).to_csv(index=False)
+    csv = recommendations_df.to_csv(index=False)
     st.download_button(
         label="Télécharger les Recommandations",
         data=csv,
@@ -127,29 +138,18 @@ def main():
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
             st.dataframe(action_plan_df)
-            
-            # Create a DataFrame for recommendations
-            recommendations_df = pd.DataFrame(columns=["requirementNo", "requirementText", "requirementScore", "requirementExplanation", "correctionDescription", "correctionResponsibility", "correctionDueDate", "correctionStatus", "correctionEvidence", "correctiveActionDescription", "correctiveActionResponsibility", "correctiveActionDueDate", "correctiveActionStatus", "releaseResponsibility", "releaseDate"])
 
-            # Get recommendations for each non-conformity
-            for index, row in action_plan_df.iterrows():
-                non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]  # Correct column name
-                requirement_number = row["Numéro d'exigence"]  # Correct column name
-                
-                # Load the document from GitHub
-                url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
-                document_text = load_document_from_github(url)
+            # Load the document from GitHub
+            url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
+            document_text = load_document_from_github(url)
 
-                if document_text:
-                    api_key = st.secrets["api_key"]
-                    model = configure_model(api_key, document_text)
+            if document_text:
+                api_key = st.secrets["api_key"]
+                model = configure_model(api_key, document_text)
 
-                    recommendations = get_ai_recommendations(non_conformity_text, requirement_number, visipact_df, ifs_checklist_df, model)
-                    recommendations_df = pd.concat([recommendations_df, pd.DataFrame([recommendations])], ignore_index=True)
-                    
-            # Display the recommendations
-            st.subheader("Recommandations de l'IA")
-            generate_table(recommendations_df)
+                recommendations = get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model)
+                st.subheader("Recommandations de l'IA")
+                generate_table(recommendations)
                 
     non_conformity_text = st.text_input("Entrez la description de la non-conformité")
     requirement_number = st.selectbox("Sélectionnez le numéro d'exigence", list(ifs_checklist_df["NUM_REQ"].values))
