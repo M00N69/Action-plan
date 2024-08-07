@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted
+from google.api_core.exceptions import ResourceExhausted, InvalidArgument
 
 # Configure the GenAI model
 def configure_model(document_text):
@@ -41,7 +41,7 @@ def load_document_from_github(url):
 def load_action_plan(uploaded_file):
     """Load the user-uploaded action plan."""
     if uploaded_file is not None:
-        action_plan_df = pd.read_excel(uploaded_file, header=12)  # header=11 to skip the first 11 rows
+        action_plan_df = pd.read_excel(uploaded_file, header=11)  # header=11 to skip the first 11 rows
         return action_plan_df
     return None
 
@@ -94,8 +94,11 @@ def get_ai_recommendations(action_plan_df, model):
         except ResourceExhausted:
             st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
             break
-        except genai.InvalidArgument as e:
-            st.error(f"Erreur lors de la génération de contenu: {str(e)}")
+        except InvalidArgument as e:
+            st.error(f"Erreur d'argument invalide lors de la génération de contenu: {str(e)}")
+            break
+        except Exception as e:
+            st.error(f"Une erreur inattendue s'est produite: {str(e)}")
             break
     return recommendations
 
@@ -133,4 +136,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
