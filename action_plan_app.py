@@ -4,8 +4,8 @@ import requests
 import google.generativeai as genai
 
 # Load VISIPACT data and IFS checklist from GitHub
-visipact_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/output%20vsipact.csv")
-ifs_checklist_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
+visipact_df = pd.read_csv("https://raw.githubusercontent.com/your-username/your-repo-name/main/data/output%20vsipact.csv")
+ifs_checklist_df = pd.read_csv("https://raw.githubusercontent.com/your-username/your-repo-name/main/ifs/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
 
 # Function to load the user-uploaded action plan
 def load_action_plan(uploaded_file):
@@ -112,33 +112,34 @@ def generate_table(recommendations):
         mime="text/csv",
     )
 
-# Streamlit App
-st.title("Assistant VisiPilot pour Plan d'Actions IFS")
+def main():
+    # Streamlit App
+    st.title("Assistant VisiPilot pour Plan d'Actions IFS")
 
-st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
-st.write("Téléchargez votre plan d'action et obtenez des recommandations pour les corrections et les actions correctives.")
+    st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
+    st.write("Téléchargez votre plan d'action et obtenez des recommandations pour les corrections et les actions correctives.")
 
-uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
-if uploaded_file is not None:
-    action_plan_df = load_action_plan(uploaded_file)
-    if action_plan_df is not None:
-        st.dataframe(action_plan_df)
+    uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
+    if uploaded_file is not None:
+        action_plan_df = load_action_plan(uploaded_file)
+        if action_plan_df is not None:
+            st.dataframe(action_plan_df)
 
-non_conformity_text = st.text_input("Entrez la description de la non-conformité")
-requirement_number = st.selectbox("Sélectionnez le numéro d'exigence", list(ifs_checklist_df["NUM_REQ"].values))
+    non_conformity_text = st.text_input("Entrez la description de la non-conformité")
+    requirement_number = st.selectbox("Sélectionnez le numéro d'exigence", list(ifs_checklist_df["NUM_REQ"].values))
 
-# Load the document from GitHub
-url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
-document_text = load_document_from_github(url)
+    # Load the document from GitHub
+    url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
+    document_text = load_document_from_github(url)
 
-if document_text:
-    api_key = st.secrets["api_key"]
-    model = configure_model(api_key, document_text)
+    if document_text:
+        api_key = st.secrets["api_key"]
+        model = configure_model(api_key, document_text)
 
-    if st.button("Obtenir des Recommandations de l'IA"):
-        recommendations = get_ai_recommendations(non_conformity_text, requirement_number, visipact_df, ifs_checklist_df, model)
-        st.subheader("Recommandations de l'IA")
-        generate_table(recommendations)
+        if st.button("Obtenir des Recommandations de l'IA"):
+            recommendations = get_ai_recommendations(non_conformity_text, requirement_number, visipact_df, ifs_checklist_df, model)
+            st.subheader("Recommandations de l'IA")
+            generate_table(recommendations)
 
 if __name__ == "__main__":
     main()
