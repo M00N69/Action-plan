@@ -4,7 +4,7 @@ import requests
 import google.generativeai as genai
 
 # Load VISIPACT data and IFS checklist from GitHub
-visipact_df = pd.read_csv("https://raw.githubusercontent.com/your-username/your-repo-name/main/data/output_visipact.csv")
+visipact_df = pd.read_csv("https://github.com/M00N69/Action-plan/blob/main/output%20vsipact.csv")
 ifs_checklist_df = pd.read_csv("https://raw.githubusercontent.com/your-username/your-repo-name/main/ifs/Guide_Checklist_IFS_Food_V_8_-_CHECKLIST.csv")
 
 # Function to load the user-uploaded action plan
