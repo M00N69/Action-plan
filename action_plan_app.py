@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted, InvalidArgument
+from google.api_core.exceptions import ResourceExhausted
 
 # Configure the GenAI model
 def configure_model(document_text):
@@ -11,7 +11,7 @@ def configure_model(document_text):
         "temperature": 2,
         "top_p": 0.4,
         "top_k": 32,
-        "max_output_tokens": 8192,
+        "max_output_tokens": 4096,  # Réduire pour éviter l'épuisement des ressources
     }
     safety_settings = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -41,7 +41,7 @@ def load_document_from_github(url):
 def load_action_plan(uploaded_file):
     """Load the user-uploaded action plan."""
     if uploaded_file is not None:
-        action_plan_df = pd.read_excel(uploaded_file, header=12)  # header=11 to skip the first 11 rows
+        action_plan_df = pd.read_excel(uploaded_file, header=12)  # header=12 to skip the first 12 rows
         return action_plan_df
     return None
 
@@ -58,10 +58,18 @@ def get_ai_recommendations(action_plan_df, model):
             st.write("Colonnes disponibles:", list(action_plan_df.columns))
             return []
 
-    for _, row in action_plan_df.iterrows():
+    for idx, row in action_plan_df.iterrows():
+        st.write(f"Traitement de la ligne {idx + 1}/{len(action_plan_df)}")
         try:
             requirement_text = row["Exigence IFS Food 8"]
             non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+
+            # Limiter la taille du texte pour éviter l'épuisement des ressources
+            if len(requirement_text) > 1000:
+                requirement_text = requirement_text[:1000] + "..."
+            if len(non_conformity_text) > 1000:
+                non_conformity_text = non_conformity_text[:1000] + "..."
+
             prompt = f"""
             Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
             J'ai un plan d'action IFS Food 8.
@@ -81,31 +89,27 @@ def get_ai_recommendations(action_plan_df, model):
             response = convo.send_message(prompt)
             corrective_actions = response.text
             recommendations.append({
-                "requirementNo": row["Numéro d'exigence"],
-                "requirementText": requirement_text,
-                "requirementScore": row["Notation"],
-                "requirementExplanation": non_conformity_text,
-                "correctiveActionDescription": corrective_actions,
+                "Numéro d'exigence": row["Numéro d'exigence"],
+                "Exigence IFS Food 8": requirement_text,
+                "Notation": row["Notation"],
+                "Explication (par l’auditeur/l’évaluateur)": non_conformity_text,
+                "Correction proposée": corrective_actions,
             })
         except KeyError as e:
             st.error(f"Colonne manquante dans le DataFrame: {e}")
             st.write("Colonnes disponibles:", list(action_plan_df.columns))
-            break
         except ResourceExhausted:
             st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
             break
-        except InvalidArgument as e:
-            st.error(f"Erreur d'argument invalide lors de la génération de contenu: {str(e)}")
-            break
         except Exception as e:
             st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-            break
+            continue  # Continuer avec la prochaine ligne en cas d'erreur
     return recommendations
 
 def generate_table(recommendations):
     """Generate a Streamlit table with recommendations."""
     recommendations_df = pd.DataFrame(recommendations)
-    st.dataframe(recommendations_df)
+    st.dataframe(recommendations_df, width=1000, height=600)
     csv = recommendations_df.to_csv(index=False)
     st.download_button(
         label="Télécharger les Recommandations",
