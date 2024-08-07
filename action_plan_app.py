@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
+import time
 
 # Configure the GenAI model
 def configure_model(document_text):
@@ -11,7 +12,7 @@ def configure_model(document_text):
         "temperature": 2,
         "top_p": 0.4,
         "top_k": 32,
-        "max_output_tokens": 4096,  # Réduire pour éviter l'épuisement des ressources
+        "max_output_tokens": 8192,
     }
     safety_settings = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -48,6 +49,7 @@ def load_action_plan(uploaded_file):
 def get_ai_recommendations(action_plan_df, model):
     """Generate AI recommendations using GenAI."""
     recommendations = []
+    all_prompts = ""
 
     required_columns = ["Exigence IFS Food 8", "Explication (par l’auditeur/l’évaluateur)", "Numéro d'exigence", "Notation"]
 
@@ -59,57 +61,51 @@ def get_ai_recommendations(action_plan_df, model):
             return []
 
     for idx, row in action_plan_df.iterrows():
-        st.write(f"Traitement de la ligne {idx + 1}/{len(action_plan_df)}")
-        try:
-            requirement_text = row["Exigence IFS Food 8"]
-            non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+        requirement_text = row["Exigence IFS Food 8"]
+        non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+        prompt = f"""
+        Une non-conformité a été trouvée pour l'exigence suivante:
+        {requirement_text}
+        
+        La description de la non-conformité est: {non_conformity_text}
 
-            # Limiter la taille du texte pour éviter l'épuisement des ressources
-            if len(requirement_text) > 1000:
-                requirement_text = requirement_text[:1000] + "..."
-            if len(non_conformity_text) > 1000:
-                non_conformity_text = non_conformity_text[:1000] + "..."
+        Veuillez fournir:
+        1. Une correction proposée.
+        2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
+        3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
 
-            prompt = f"""
-            Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
-            J'ai un plan d'action IFS Food 8.
-            Une non-conformité a été trouvée pour l'exigence suivante:
-            {requirement_text}
-            
-            La description de la non-conformité est: {non_conformity_text}
+        """
+        all_prompts += prompt
 
-            Veuillez fournir:
-            1. Une correction proposée.
-            2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
-            3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
+    try:
+        convo = model.start_chat(history=[{"role": "user", "parts": [all_prompts]}])
+        response = convo.send_message(all_prompts)
+        corrective_actions = response.text
+        actions = corrective_actions.split("\n\n")
 
-            N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
-            """
-            convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
-            response = convo.send_message(prompt)
-            corrective_actions = response.text
+        for idx, row in action_plan_df.iterrows():
             recommendations.append({
                 "Numéro d'exigence": row["Numéro d'exigence"],
-                "Exigence IFS Food 8": requirement_text,
+                "Exigence IFS Food 8": row["Exigence IFS Food 8"],
                 "Notation": row["Notation"],
-                "Explication (par l’auditeur/l’évaluateur)": non_conformity_text,
-                "Correction proposée": corrective_actions,
+                "Explication (par l’auditeur/l’évaluateur)": row["Explication (par l’auditeur/l’évaluateur)"],
+                "Correction proposée": actions[idx] if idx < len(actions) else "Pas de recommandation disponible",
             })
-        except KeyError as e:
-            st.error(f"Colonne manquante dans le DataFrame: {e}")
-            st.write("Colonnes disponibles:", list(action_plan_df.columns))
-        except ResourceExhausted:
-            st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
-            break
-        except Exception as e:
-            st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-            continue  # Continuer avec la prochaine ligne en cas d'erreur
+
+    except ResourceExhausted:
+        st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
+    except Exception as e:
+        st.error(f"Une erreur inattendue s'est produite: {str(e)}")
+
     return recommendations
 
 def generate_table(recommendations):
     """Generate a Streamlit table with recommendations."""
     recommendations_df = pd.DataFrame(recommendations)
-    st.dataframe(recommendations_df, width=1000, height=600)
+    st.dataframe(recommendations_df.style.set_properties(**{
+        'white-space': 'pre-wrap',
+        'text-align': 'left'
+    }))
     csv = recommendations_df.to_csv(index=False)
     st.download_button(
         label="Télécharger les Recommandations",
@@ -129,7 +125,10 @@ def main():
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
-            st.dataframe(action_plan_df)
+            st.dataframe(action_plan_df.style.set_properties(**{
+                'white-space': 'pre-wrap',
+                'text-align': 'left'
+            }))
             url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
             document_text = load_document_from_github(url)
             if document_text:
@@ -140,5 +139,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
