@@ -4,23 +4,19 @@ import requests
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 
-# Load VISIPACT data and IFS checklist from GitHub
+# Load IFS checklist from GitHub
 @st.cache_data(ttl=86400)
-def load_data():
-    visipact_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/output%20vsipact.csv")
+def load_ifs_checklist():
     ifs_checklist_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
-    return visipact_df, ifs_checklist_df
+    return ifs_checklist_df
 
-visipact_df, ifs_checklist_df = load_data()
+ifs_checklist_df = load_ifs_checklist()
 
 def load_action_plan(uploaded_file):
     """Load the user-uploaded action plan."""
     if uploaded_file is not None:
-        if uploaded_file.name.endswith(".xlsx"):
-            action_plan_df = pd.read_excel(uploaded_file, header=12)  # header=11 to skip the first 11 rows
-            return action_plan_df
-        else:
-            st.error("Type de fichier incorrect. Veuillez télécharger un fichier Excel.")
+        action_plan_df = pd.read_excel(uploaded_file, header=11)  # header=11 to skip the first 11 rows
+        return action_plan_df
     return None
 
 def configure_model(api_key, document_text):
@@ -57,10 +53,9 @@ def load_document_from_github(url):
         st.error(f"Échec de téléchargement du document: {str(e)}")
         return None
 
-def get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model):
+def get_ai_recommendations(action_plan_df, ifs_checklist_df, model):
     """Generate AI recommendations using GenAI."""
     recommendations = []
-    visipact_context = visipact_df.to_string(index=False)
 
     required_columns = ["Exigence IFS Food 8", "Explication (par l’auditeur/l’évaluateur)", "Numéro d'exigence", "Notation"]
 
@@ -84,13 +79,10 @@ def get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model)
             La description de la non-conformité est: {non_conformity_text}
 
             Veuillez fournir:
-            1. Une correction proposée basée sur les données historiques de VISIPACT.
+            1. Une correction proposée.
             2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
             3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
 
-            Voici quelques données historiques de VISIPACT:
-            {visipact_context}
-            
             N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
             """
             convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
@@ -140,7 +132,7 @@ def main():
             if document_text:
                 api_key = st.secrets["api_key"]
                 model = configure_model(api_key, document_text)
-                recommendations = get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model)
+                recommendations = get_ai_recommendations(action_plan_df, ifs_checklist_df, model)
                 st.subheader("Recommandations de l'IA")
                 generate_table(recommendations)
 
