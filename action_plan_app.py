@@ -4,29 +4,14 @@ import requests
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 
-# Load IFS checklist from GitHub
-@st.cache_data(ttl=86400)
-def load_ifs_checklist():
-    ifs_checklist_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
-    return ifs_checklist_df
-
-ifs_checklist_df = load_ifs_checklist()
-
-def load_action_plan(uploaded_file):
-    """Load the user-uploaded action plan."""
-    if uploaded_file is not None:
-        action_plan_df = pd.read_excel(uploaded_file, header=12)  # header=11 to skip the first 11 rows
-        return action_plan_df
-    return None
-
-def configure_model(api_key, document_text):
-    """Configure the GenAI model."""
-    genai.configure(api_key=api_key)
+# Configure the GenAI model
+def configure_model(document_text):
+    genai.configure(api_key=st.secrets["api_key"])
     generation_config = {
         "temperature": 2,
         "top_p": 0.4,
         "top_k": 32,
-        "max_output_tokens": 4096,  # Reduce the maximum output tokens to save resources
+        "max_output_tokens": 8192,
     }
     safety_settings = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -35,7 +20,7 @@ def configure_model(api_key, document_text):
         {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
     ]
     model = genai.GenerativeModel(
-        model_name="gemini-pro",
+        model_name="gemini-1.5-pro-latest",
         generation_config=generation_config,
         system_instruction=document_text,
         safety_settings=safety_settings
@@ -53,7 +38,14 @@ def load_document_from_github(url):
         st.error(f"Échec de téléchargement du document: {str(e)}")
         return None
 
-def get_ai_recommendations(action_plan_df, ifs_checklist_df, model):
+def load_action_plan(uploaded_file):
+    """Load the user-uploaded action plan."""
+    if uploaded_file is not None:
+        action_plan_df = pd.read_excel(uploaded_file, header=11)  # header=11 to skip the first 11 rows
+        return action_plan_df
+    return None
+
+def get_ai_recommendations(action_plan_df, model):
     """Generate AI recommendations using GenAI."""
     recommendations = []
 
@@ -102,6 +94,9 @@ def get_ai_recommendations(action_plan_df, ifs_checklist_df, model):
         except ResourceExhausted:
             st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
             break
+        except genai.InvalidArgument as e:
+            st.error(f"Erreur lors de la génération de contenu: {str(e)}")
+            break
     return recommendations
 
 def generate_table(recommendations):
@@ -118,6 +113,7 @@ def generate_table(recommendations):
 
 def main():
     """Main function for the Streamlit app."""
+    st.image('https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/visipilot%20banner.PNG', use_column_width=True)
     st.title("Assistant VisiPilot pour Plan d'Actions IFS")
     st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
     st.write("Téléchargez votre plan d'action et obtenez des recommandations pour les corrections et les actions correctives.")
@@ -130,11 +126,11 @@ def main():
             url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
             document_text = load_document_from_github(url)
             if document_text:
-                api_key = st.secrets["api_key"]
-                model = configure_model(api_key, document_text)
-                recommendations = get_ai_recommendations(action_plan_df, ifs_checklist_df, model)
+                model = configure_model(document_text)
+                recommendations = get_ai_recommendations(action_plan_df, model)
                 st.subheader("Recommandations de l'IA")
                 generate_table(recommendations)
 
 if __name__ == "__main__":
     main()
+
