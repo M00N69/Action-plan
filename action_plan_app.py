@@ -60,36 +60,44 @@ def load_document_from_github(url):
 def get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model):
     """Generate AI recommendations using GenAI."""
     recommendations = []
+    visipact_context = visipact_df.to_string(index=False)
+    
     for _, row in action_plan_df.iterrows():
-        prompt = f"""
-        Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
-        J'ai un plan d'action IFS Food 8.
-        Une non-conformité a été trouvée pour l'exigence suivante:
-        {row["Exigence IFS Food 8"]}
-        
-        La description de la non-conformité est: {row["Explication (par l’auditeur/l’évaluateur)"]}
-
-        Veuillez fournir:
-        1. Une correction proposée basée sur les données historiques de VISIPACT.
-        2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
-        3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
-
-        Voici quelques données historiques de VISIPACT:
-        {visipact_df[["NomUnite", "CONSTATSDAUDIT", "ACTIONFOURNISSEUR"]].to_string()}
-        
-        N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
-        """
         try:
+            requirement_text = row["Exigence IFS Food 8"]
+            non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+            prompt = f"""
+            Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
+            J'ai un plan d'action IFS Food 8.
+            Une non-conformité a été trouvée pour l'exigence suivante:
+            {requirement_text}
+            
+            La description de la non-conformité est: {non_conformity_text}
+
+            Veuillez fournir:
+            1. Une correction proposée basée sur les données historiques de VISIPACT.
+            2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
+            3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
+
+            Voici quelques données historiques de VISIPACT:
+            {visipact_context}
+            
+            N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
+            """
             convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
-            response = convo.send_message(prompt) 
+            response = convo.send_message(prompt)
             corrective_actions = response.text
             recommendations.append({
                 "requirementNo": row["Numéro d'exigence"],
-                "requirementText": row["Exigence IFS Food 8"],
+                "requirementText": requirement_text,
                 "requirementScore": row["Notation"],
-                "requirementExplanation": row["Explication (par l’auditeur/l’évaluateur)"],
+                "requirementExplanation": non_conformity_text,
                 "correctiveActionDescription": corrective_actions,
             })
+        except KeyError as e:
+            st.error(f"Colonne manquante dans le DataFrame: {e}")
+            st.write("Colonnes disponibles:", list(action_plan_df.columns))
+            break
         except ResourceExhausted:
             st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
             break
@@ -126,13 +134,6 @@ def main():
                 recommendations = get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model)
                 st.subheader("Recommandations de l'IA")
                 generate_table(recommendations)
-
-    non_conformity_text = st.text_input("Entrez la description de la non-conformité")
-    requirement_number = st.selectbox("Sélectionnez le numéro d'exigence", list(ifs_checklist_df["NUM_REQ"].values))
-    if st.button("Obtenir des Recommandations de l'IA"):
-        recommendations = get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model)
-        st.subheader("Recommandations de l'IA")
-        generate_table(recommendations)
 
 if __name__ == "__main__":
     main()
