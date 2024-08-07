@@ -17,7 +17,7 @@ def load_action_plan(uploaded_file):
     """Load the user-uploaded action plan."""
     if uploaded_file is not None:
         if uploaded_file.name.endswith(".xlsx"):
-            action_plan_df = pd.read_excel(uploaded_file, header=12)  # header=11 to skip the first 11 rows
+            action_plan_df = pd.read_excel(uploaded_file, header=11)  # header=11 to skip the first 11 rows
             return action_plan_df
         else:
             st.error("Type de fichier incorrect. Veuillez télécharger un fichier Excel.")
@@ -61,7 +61,16 @@ def get_ai_recommendations(action_plan_df, visipact_df, ifs_checklist_df, model)
     """Generate AI recommendations using GenAI."""
     recommendations = []
     visipact_context = visipact_df.to_string(index=False)
-    
+
+    required_columns = ["Exigence IFS Food 8", "Explication (par l’auditeur/l’évaluateur)", "Numéro d'exigence", "Notation"]
+
+    # Vérifier la présence des colonnes nécessaires
+    for col in required_columns:
+        if col not in action_plan_df.columns:
+            st.error(f"La colonne requise '{col}' est manquante dans le fichier téléchargé.")
+            st.write("Colonnes disponibles:", list(action_plan_df.columns))
+            return []
+
     for _, row in action_plan_df.iterrows():
         try:
             requirement_text = row["Exigence IFS Food 8"]
