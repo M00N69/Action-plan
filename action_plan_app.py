@@ -11,7 +11,8 @@ ifs_checklist_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-
 def load_action_plan(uploaded_file):
     if uploaded_file is not None:
         if uploaded_file.name.endswith(".xlsx"):
-            action_plan_df = pd.read_excel(uploaded_file)
+            # Skip the first 11 rows and use the 12th row as the header
+            action_plan_df = pd.read_excel(uploaded_file, header=11) 
         else:
             st.error("Type de fichier incorrect. Veuillez télécharger un fichier Excel.")
             action_plan_df = None
@@ -93,6 +94,7 @@ def get_ai_recommendations(non_conformity_text, requirement_number, visipact_df,
 
     return recommendations
 
+
 # Function to generate a Streamlit table with recommendations
 def generate_table(recommendations):
     table_data = {
@@ -131,8 +133,8 @@ def main():
 
             # Get recommendations for each non-conformity
             for index, row in action_plan_df.iterrows():
-                non_conformity_text = row["requirementExplanation"]
-                requirement_number = row["requirementNo"]
+                non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]  # Correct column name
+                requirement_number = row["Numéro d'exigence"]  # Correct column name
                 
                 # Load the document from GitHub
                 url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
