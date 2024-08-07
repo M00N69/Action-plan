@@ -12,7 +12,7 @@ def load_action_plan(uploaded_file):
     if uploaded_file is not None:
         if uploaded_file.name.endswith(".xlsx"):
             # Skip the first 11 rows and use the 12th row as the header
-            action_plan_df = pd.read_excel(uploaded_file, header=11) 
+            action_plan_df = pd.read_excel(uploaded_file, header=12) 
         else:
             st.error("Type de fichier incorrect. Veuillez télécharger un fichier Excel.")
             action_plan_df = None
