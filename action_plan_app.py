@@ -66,16 +66,25 @@ def load_document_from_github(url):
 def load_action_plan(uploaded_file):
     if uploaded_file is not None:
         try:
+            # Load the file without specifying header to inspect column names
             temp_df = pd.read_excel(uploaded_file, header=None)
-            header_row_index = 12
+
+            # Identify the correct header row (adjust the index based on actual header location)
+            header_row_index = 12  # Adjust this index based on your file structure
             action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
 
+            # Attempt to rename columns to match expected format
+            action_plan_df.columns = [col.strip() for col in action_plan_df.columns]
+            action_plan_df = action_plan_df.rename(columns={
+                "Numéro d'exigence": "Numéro d'exigence",
+                "Exigence IFS Food 8": "Exigence IFS Food 8",
+                "Notation": "Notation",
+                "Explication (par l’auditeur/l’évaluateur)": "Explication (par l’auditeur/l’évaluateur)"
+            })
+
+            # Selecting expected columns
             expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
-            if all(col in action_plan_df.columns for col in expected_columns):
-                action_plan_df = action_plan_df[expected_columns]
-            else:
-                st.error(f"Les colonnes attendues ne sont pas présentes dans le fichier. Colonnes trouvées: {action_plan_df.columns.tolist()}")
-                return None
+            action_plan_df = action_plan_df[expected_columns]
 
             return action_plan_df
         except Exception as e:
@@ -185,7 +194,7 @@ def main():
         if action_plan_df is not None:
             st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
             
-            url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
+            url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
             document_text = load_document_from_github(url)
             if document_text:
                 model = configure_model(document_text)
