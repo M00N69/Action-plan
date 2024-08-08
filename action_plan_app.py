@@ -68,7 +68,6 @@ def add_css_styles():
         unsafe_allow_html=True
     )
 
-# Configure the GenAI model
 def configure_model(document_text):
     genai.configure(api_key=st.secrets["api_key"])
     generation_config = {
@@ -109,14 +108,12 @@ def load_action_plan(uploaded_file):
         return action_plan_df
     return None
 
-def prepare_prompts(action_plan_df):
-    prompts = []
+def prepare_prompt(action_plan_df):
+    prompt = "Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. J'ai un plan d'action IFS Food 8.\n"
     for _, row in action_plan_df.iterrows():
         requirement_text = row["Exigence IFS Food 8"]
         non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
-        prompt = f"""
-        Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
-        J'ai un plan d'action IFS Food 8.
+        prompt += f"""
         Une non-conformité a été trouvée pour l'exigence suivante:
         {requirement_text}
         
@@ -125,53 +122,49 @@ def prepare_prompts(action_plan_df):
         Veuillez fournir:
         1. Une correction proposée.
         2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
-        3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
-
-        N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
+        3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8.
         """
-        prompts.append(prompt)
-    return prompts
+    prompt += "\nN'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations."
+    return prompt
 
-def get_ai_recommendations(prompts, model):
+def get_ai_recommendations(prompt, model):
     recommendations = []
-    for prompt in prompts:
-        try:
-            convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
-            response = convo.send_message(prompt)
-            corrective_actions = response.text
-            recommendations.append(parse_recommendation(corrective_actions))
-            time.sleep(5)
-        except ResourceExhausted:
-            st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
-            break
-        except Exception as e:
-            st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-            recommendations.append({
-                "Correction proposée": "Erreur lors de la génération de la recommandation",
-                "Plan d'action": "",
-                "Preuves": ""
-            })
+    try:
+        convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
+        response = convo.send_message(prompt)
+        recommendations_text = response.text
+        recommendations = parse_recommendations(recommendations_text)
+    except ResourceExhausted:
+        st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
+    except Exception as e:
+        st.error(f"Une erreur inattendue s'est produite: {str(e)}")
+        recommendations.append({
+            "Correction proposée": "Erreur lors de la génération de la recommandation",
+            "Plan d'action": "",
+            "Preuves": ""
+        })
     return recommendations
 
-def parse_recommendation(text):
-    parts = text.split('\n\n', 2)
-    correction = parts[0] if len(parts) > 0 else "Pas de correction disponible"
-    plan_action = parts[1] if len(parts) > 1 else "Pas de plan d'action disponible"
-    preuves = parts[2] if len(parts) > 2 else "Pas de preuves disponibles"
-    return {
-        "Correction proposée": correction,
-        "Plan d'action": plan_action,
-        "Preuves": preuves
-    }
+def parse_recommendations(text):
+    recommendations = []
+    parts = text.split("\n\n")
+    for i in range(0, len(parts), 3):
+        correction = parts[i] if i < len(parts) else "Pas de correction disponible"
+        plan_action = parts[i+1] if i+1 < len(parts) else "Pas de plan d'action disponible"
+        preuves = parts[i+2] if i+2 < len(parts) else "Pas de preuves disponibles"
+        recommendations.append({
+            "Correction proposée": correction,
+            "Plan d'action": plan_action,
+            "Preuves": preuves
+        })
+    return recommendations
+
+def dataframe_to_html(df):
+    return df.to_html(classes='dataframe table-container', escape=False, index=False)
 
 def generate_table(recommendations):
     recommendations_df = pd.DataFrame(recommendations)
-    st.markdown('<div class="table-container">', unsafe_allow_html=True)
-    st.dataframe(recommendations_df.style.set_properties(**{
-        'white-space': 'pre-wrap',
-        'text-align': 'left'
-    }))
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="table-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
     csv = recommendations_df.to_csv(index=False)
     st.download_button(
         label="Télécharger les Recommandations",
@@ -192,19 +185,14 @@ def main():
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
-            st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.dataframe(action_plan_df.style.set_properties(**{
-                'white-space': 'pre-wrap',
-                'text-align': 'left'
-            }))
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div class="table-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
             
             url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
             document_text = load_document_from_github(url)
             if document_text:
                 model = configure_model(document_text)
-                prompts = prepare_prompts(action_plan_df)
-                recommendations = get_ai_recommendations(prompts, model)
+                prompt = prepare_prompt(action_plan_df)
+                recommendations = get_ai_recommendations(prompt, model)
                 st.subheader("Recommandations de l'IA")
                 generate_table(recommendations)
 
