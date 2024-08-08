@@ -183,6 +183,21 @@ def display_recommendations(recommendations, action_plan_df):
         
         st.markdown('</div>', unsafe_allow_html=True)
 
+def generate_downloadable_text(recommendations, action_plan_df):
+    output = "Plan d'action IFS Food 8 : Corrections et Actions Correctives\n\n"
+    for index, (i, row) in enumerate(action_plan_df.iterrows()):
+        output += f"Non-conformité {index + 1} : {row['Exigence IFS Food 8']}\n"
+        output += f"Description de la non-conformité : {row['Explication (par l’auditeur/l’évaluateur)']}\n"
+        if index < len(recommendations):
+            rec = recommendations[index]
+            output += f"Correction proposée : {rec['Correction proposée']}\n"
+            output += f"Preuves potentielles : {rec['Preuves potentielles']}\n"
+            output += f"Actions correctives : {rec['Actions correctives']}\n"
+        else:
+            output += "Recommandation manquante pour cette non-conformité.\n"
+        output += "\n"
+    return output
+
 def main():
     add_css_styles()
     
@@ -205,6 +220,15 @@ def main():
                 recommendations = get_ai_recommendations(prompt, model)
                 st.subheader("Recommandations de l'IA")
                 display_recommendations(recommendations, action_plan_df)
+                
+                if st.button("Télécharger les Recommandations"):
+                    text_output = generate_downloadable_text(recommendations, action_plan_df)
+                    st.download_button(
+                        label="Télécharger le fichier",
+                        data=text_output,
+                        file_name="recommandations_ifs.txt",
+                        mime="text/plain"
+                    )
 
 if __name__ == "__main__":
     main()
