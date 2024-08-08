@@ -218,8 +218,9 @@ def main():
                         st.write("Bouton cliqué")  # Ajout de message de débogage
                         st.session_state.action_plan_df = action_plan_df
                         st.session_state.page = 2
+                        st.experimental_rerun()  # Ajout de rafraîchissement pour forcer le changement de page
 
-    if st.session_state.page == 2:
+    elif st.session_state.page == 2:
         st.write("Chargement de la page 2")  # Ajout de message de débogage
         # Check if action_plan_df is in the session state before trying to use it
         if "action_plan_df" in st.session_state:
