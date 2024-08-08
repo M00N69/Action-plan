@@ -129,6 +129,7 @@ def get_ai_recommendations(prompt, model):
         convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
         response = convo.send_message(prompt)
         recommendations_text = response.text
+        st.write(f"Recommendations Text: {recommendations_text}")  # Debugging line
         recommendations = parse_recommendations(recommendations_text)
     except ResourceExhausted:
         st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
@@ -144,6 +145,7 @@ def get_ai_recommendations(prompt, model):
 def parse_recommendations(text):
     recommendations = []
     blocks = text.split("\n\n")
+    st.write(f"Blocks: {blocks}")  # Debugging line
     for block in blocks:
         lines = block.split("\n")
         correction = ""
@@ -168,6 +170,7 @@ def dataframe_to_html(df):
     return df.to_html(classes='dataframe table-container', escape=False, index=False)
 
 def generate_table(recommendations, action_plan_df):
+    st.write(f"Generated Recommendations: {recommendations}")  # Debugging line
     if len(recommendations) != len(action_plan_df):
         st.error(f"Le nombre de recommandations générées ({len(recommendations)}) ne correspond pas au nombre de non-conformités ({len(action_plan_df)}).")
         return
