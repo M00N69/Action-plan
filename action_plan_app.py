@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
+import time
 
 # Utiliser le mode wide pour l'application
 st.set_page_config(layout="wide")
@@ -91,7 +92,7 @@ def load_action_plan(uploaded_file):
             st.write("Colonnes du fichier chargé:", temp_df.head(5))
             
             # Identify the correct header row (adjust the index based on actual header location)
-            header_row_index = 0  # Adjust this index based on your file structure
+            header_row_index = 12  # Adjust this index based on your file structure
             action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
             st.write("Colonnes après ajustement du header:", action_plan_df.columns.tolist())
 
@@ -101,13 +102,11 @@ def load_action_plan(uploaded_file):
                 "Numéro d'exigence": "Numéro d'exigence",
                 "Exigence IFS Food 8": "Exigence IFS Food 8",
                 "Notation": "Notation",
-                "Explication (par l’auditeur/l’évaluateur)": "Explication (par l’auditeur/l’évaluateur)",
-                "Correction (par l’entreprise)": "Correction proposée",
-                "Action corrective (par l’entreprise)": "Action corrective proposée"
+                "Explication (par l’auditeur/l’évaluateur)": "Explication (par l’auditeur/l’évaluateur)"
             })
             
             # Selecting expected columns
-            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)", "Correction proposée", "Action corrective proposée"]
+            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
             action_plan_df = action_plan_df[expected_columns]
 
             return action_plan_df
