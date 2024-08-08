@@ -106,7 +106,7 @@ def load_action_plan(uploaded_file):
             st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
     return None
 
-def prepare_prompt(action_plan_df):
+def prepare_prompt(action_plan_df, guide_text):
     prompt = "Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. J'ai un plan d'action IFS Food 8.\n"
     for _, row in action_plan_df.iterrows():
         requirement_text = row["Exigence IFS Food 8"]
@@ -122,7 +122,7 @@ def prepare_prompt(action_plan_df):
         2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
         3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8.
         """
-    prompt += "\nN'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations."
+    prompt += f"\nN'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations. Voici le texte du guide:\n{guide_text}"
     return prompt
 
 def get_ai_recommendations(prompt, model):
@@ -137,76 +137,85 @@ def get_ai_recommendations(prompt, model):
     except Exception as e:
         st.error(f"Une erreur inattendue s'est produite: {str(e)}")
         recommendations.append({
-            "Correction proposée": "Erreur lors de la génération de la recommandation",
-            "Plan d'action": "",
-            "Preuves": ""
+            "Exigence IFS Food 8": "",
+            "Non-conformité #": "Erreur lors de la génération de la recommandation",
+            "Correction proposée": "",
+            "Preuve possible": "",
+            "Action corrective proposée": ""
         })
     return recommendations
 
 def parse_recommendations(text):
     recommendations = []
     parts = text.split("\n\n")
-    for i in range(0, len(parts), 3):
-        correction = parts[i] if i < len(parts) else "Pas de correction disponible"
-        plan_action = parts[i+1] if i+1 < len(parts) else "Pas de plan d'action disponible"
-        preuves = parts[i+2] if i+2 < len(parts) else "Pas de preuves disponibles"
+    for i in range(0, len(parts), 5):
+        exigence = parts[i] if i < len(parts) else "Pas d'exigence disponible"
+        non_conformite = parts[i+1] if i+1 < len(parts) else "Pas de non-conformité disponible"
+        correction = parts[i+2] if i+2 < len(parts) else "Pas de correction disponible"
+        preuve = parts[i+3] if i+3 < len(parts) else "Pas de preuve disponible"
+        action_corrective = parts[i+4] if i+4 < len(parts) else "Pas d'action corrective disponible"
         recommendations.append({
+            "Exigence IFS Food 8": exigence,
+            "Non-conformité #": non_conformite,
             "Correction proposée": correction,
-            "Plan d'action": plan_action,
-            "Preuves": preuves
+            "Preuve possible": preuve,
+            "Action corrective proposée": action_corrective
         })
     return recommendations
 
 def dataframe_to_html(df):
     return df.to_html(classes='dataframe table-container', escape=False, index=False)
 
-def generate_table(recommendations):
-    recommendations_df = pd.DataFrame(recommendations)
-    st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
-    csv = recommendations_df.to_csv(index=False)
-    st.download_button(
-        label="Télécharger les Recommandations",
-        data=csv,
-        file_name="recommendations.csv",
-        mime="text/csv",
-    )
-
 def main():
     add_css_styles()
     
     st.image('https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/visipilot%20banner.PNG', use_column_width=True)
     st.title("Assistant VisiPilot pour Plan d'Actions IFS")
-    st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
     
-    uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
-    if uploaded_file:
-        action_plan_df = load_action_plan(uploaded_file)
-        if action_plan_df is not None:
-            st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
+    # Use session state to manage the flow between pages
+    if "page" not in st.session_state:
+        st.session_state.page = 1
+
+    if st.session_state.page == 1:
+        st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
+        uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
+        if uploaded_file:
+            action_plan_df = load_action_plan(uploaded_file)
+            if action_plan_df is not None:
+                st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
+                if st.button("Obtenir des recommandations de l'IA"):
+                    st.session_state.action_plan_df = action_plan_df
+                    st.session_state.page = 2
+                    st.experimental_rerun()
+    elif st.session_state.page == 2:
+        action_plan_df = st.session_state.action_plan_df
+        
+        # Load the guide document for reference
+        guide_url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
+        guide_text = load_document_from_github(guide_url)
+        if guide_text:
+            model = configure_model(guide_text)
+            prompt = prepare_prompt(action_plan_df, guide_text)
+            recommendations = get_ai_recommendations(prompt, model)
+            st.subheader("Recommandations de l'IA")
             
-            if st.button("Obtenir des recommandations de l'IA"):
-                # Load the guide document for reference
-                guide_url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
-                guide_text = load_document_from_github(guide_url)
-                if guide_text:
-                    model = configure_model(guide_text)
-                    prompt = prepare_prompt(action_plan_df)
-                    recommendations = get_ai_recommendations(prompt, model)
-                    st.subheader("Recommandations de l'IA")
-                    
-                    recommendations_df = pd.DataFrame(recommendations)
-                    st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
-                    
-                    csv = recommendations_df.to_csv(index=False)
-                    st.download_button(
-                        label="Télécharger les Recommandations",
-                        data=csv,
-                        file_name="recommendations.csv",
-                        mime="text/csv",
-                    )
+            recommendations_df = pd.DataFrame(recommendations)
+            st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
+            
+            csv = recommendations_df.to_csv(index=False)
+            st.download_button(
+                label="Télécharger les Recommandations",
+                data=csv,
+                file_name="recommendations.csv",
+                mime="text/csv",
+            )
+        if st.button("Retour"):
+            st.session_state.page = 1
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
+
 
 
 
