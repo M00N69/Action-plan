@@ -49,7 +49,6 @@ def load_action_plan(uploaded_file):
 def get_ai_recommendations(action_plan_df, model):
     """Generate AI recommendations using GenAI."""
     recommendations = []
-    all_prompts = ""
 
     required_columns = ["Exigence IFS Food 8", "Explication (par l’auditeur/l’évaluateur)", "Numéro d'exigence", "Notation"]
 
@@ -61,42 +60,45 @@ def get_ai_recommendations(action_plan_df, model):
             return []
 
     for idx, row in action_plan_df.iterrows():
-        requirement_text = row["Exigence IFS Food 8"]
-        non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
-        prompt = f"""
-        Une non-conformité a été trouvée pour l'exigence suivante:
-        {requirement_text}
-        
-        La description de la non-conformité est: {non_conformity_text}
+        try:
+            requirement_text = row["Exigence IFS Food 8"]
+            non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+            prompt = f"""
+            Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
+            J'ai un plan d'action IFS Food 8.
+            Une non-conformité a été trouvée pour l'exigence suivante:
+            {requirement_text}
+            
+            La description de la non-conformité est: {non_conformity_text}
 
-        Veuillez fournir:
-        1. Une correction proposée.
-        2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
-        3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
+            Veuillez fournir:
+            1. Une correction proposée.
+            2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
+            3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
 
-        """
-        all_prompts += prompt
-
-    try:
-        convo = model.start_chat(history=[{"role": "user", "parts": [all_prompts]}])
-        response = convo.send_message(all_prompts)
-        corrective_actions = response.text
-        actions = corrective_actions.split("\n\n")
-
-        for idx, row in action_plan_df.iterrows():
+            N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
+            """
+            convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
+            response = convo.send_message(prompt)
+            corrective_actions = response.text
             recommendations.append({
                 "Numéro d'exigence": row["Numéro d'exigence"],
-                "Exigence IFS Food 8": row["Exigence IFS Food 8"],
+                "Exigence IFS Food 8": requirement_text,
                 "Notation": row["Notation"],
-                "Explication (par l’auditeur/l’évaluateur)": row["Explication (par l’auditeur/l’évaluateur)"],
-                "Correction proposée": actions[idx] if idx < len(actions) else "Pas de recommandation disponible",
+                "Explication (par l’auditeur/l’évaluateur)": non_conformity_text,
+                "Correction proposée": corrective_actions,
             })
-
-    except ResourceExhausted:
-        st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
-    except Exception as e:
-        st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-
+            # Temporiser entre les appels pour éviter l'épuisement des ressources
+            time.sleep(2)
+        except KeyError as e:
+            st.error(f"Colonne manquante dans le DataFrame: {e}")
+            st.write("Colonnes disponibles:", list(action_plan_df.columns))
+        except ResourceExhausted:
+            st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
+            break
+        except Exception as e:
+            st.error(f"Une erreur inattendue s'est produite: {str(e)}")
+            continue  # Continuer avec la prochaine ligne en cas d'erreur
     return recommendations
 
 def generate_table(recommendations):
@@ -139,6 +141,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
