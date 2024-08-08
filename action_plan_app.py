@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
-import time
 
 # Utiliser le mode wide pour l'application
 st.set_page_config(layout="wide")
@@ -90,12 +89,10 @@ def load_action_plan(uploaded_file):
             # Load the file without specifying header to inspect column names
             temp_df = pd.read_excel(uploaded_file, header=None)
             
-            
             # Identify the correct header row (adjust the index based on actual header location)
             header_row_index = 12  # Adjust this index based on your file structure
             action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
             
-
             # Correct column names
             expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
             if all(col in action_plan_df.columns for col in expected_columns):
@@ -180,22 +177,33 @@ def main():
     st.image('https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/visipilot%20banner.PNG', use_column_width=True)
     st.title("Assistant VisiPilot pour Plan d'Actions IFS")
     st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
-    st.write("Téléchargez votre plan d'action et obtenez des recommandations pour les corrections et les actions correctives.")
-
+    
     uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
             st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
             
-            url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
-            document_text = load_document_from_github(url)
-            if document_text:
-                model = configure_model(document_text)
-                prompt = prepare_prompt(action_plan_df)
-                recommendations = get_ai_recommendations(prompt, model)
-                st.subheader("Recommandations de l'IA")
-                generate_table(recommendations)
+            if st.button("Obtenir des recommandations de l'IA"):
+                # Load the guide document for reference
+                guide_url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
+                guide_text = load_document_from_github(guide_url)
+                if guide_text:
+                    model = configure_model(guide_text)
+                    prompt = prepare_prompt(action_plan_df)
+                    recommendations = get_ai_recommendations(prompt, model)
+                    st.subheader("Recommandations de l'IA")
+                    
+                    recommendations_df = pd.DataFrame(recommendations)
+                    st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
+                    
+                    csv = recommendations_df.to_csv(index=False)
+                    st.download_button(
+                        label="Télécharger les Recommandations",
+                        data=csv,
+                        file_name="recommendations.csv",
+                        mime="text/csv",
+                    )
 
 if __name__ == "__main__":
     main()
