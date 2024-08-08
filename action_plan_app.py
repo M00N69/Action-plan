@@ -86,10 +86,13 @@ def load_document_from_github(url):
 
 def load_action_plan(uploaded_file):
     if uploaded_file is not None:
-        action_plan_df = pd.read_excel(uploaded_file, header=12)
-        columns_to_keep = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
-        action_plan_df = action_plan_df[columns_to_keep]
-        return action_plan_df
+        try:
+            action_plan_df = pd.read_excel(uploaded_file, header=0)  # Assuming the header is in the first row
+            columns_to_keep = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
+            action_plan_df = action_plan_df[columns_to_keep]
+            return action_plan_df
+        except Exception as e:
+            st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
     return None
 
 def prepare_prompt(action_plan_df):
