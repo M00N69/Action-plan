@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
-import time
 
 # Utiliser le mode wide pour l'application
 st.set_page_config(layout="wide")
@@ -198,10 +197,13 @@ def main():
     if "page" not in st.session_state:
         st.session_state.page = 1
 
+    st.write(f"Page actuelle : {st.session_state.page}")  # Ajout de message de débogage
+
     if st.session_state.page == 1:
         st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
         uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
         if uploaded_file:
+            st.write("Fichier téléchargé avec succès")  # Ajout de message de débogage
             action_plan_df = load_action_plan(uploaded_file)
             if action_plan_df is not None:
                 # Display the table
@@ -213,10 +215,13 @@ def main():
                 # Move the button to the top of the container
                 with button_container:
                     if st.button("Obtenir des recommandations de l'IA"):
+                        st.write("Bouton cliqué")  # Ajout de message de débogage
                         st.session_state.action_plan_df = action_plan_df
                         st.session_state.page = 2
+                        st.experimental_rerun()  # Ajout de rafraîchissement pour forcer le changement de page
 
     elif st.session_state.page == 2:
+        st.write("Chargement de la page 2")  # Ajout de message de débogage
         # Check if action_plan_df is in the session state before trying to use it
         if "action_plan_df" in st.session_state:
             action_plan_df = st.session_state.action_plan_df
@@ -249,9 +254,11 @@ def main():
         # Add a button to go back to the first page
         if st.button("Retour"):
             st.session_state.page = 1
+            st.experimental_rerun()  # Ajout de rafraîchissement pour forcer le changement de page
 
 if __name__ == "__main__":
     main()
+
 
 
 
