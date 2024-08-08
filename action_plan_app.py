@@ -88,19 +88,22 @@ def load_action_plan(uploaded_file):
         try:
             # Load the file without specifying header to inspect column names
             temp_df = pd.read_excel(uploaded_file, header=None)
+            st.write("Colonnes du fichier chargé:", temp_df.head(5))
             
             # Identify the correct header row (adjust the index based on actual header location)
-            header_row_index = 0  # Adjusted based on found columns
+            header_row_index = 0  # Adjust this index based on your file structure
             action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
-            
-            # Renaming columns to match expected format
+            st.write("Colonnes après ajustement du header:", action_plan_df.columns.tolist())
+
+            # Attempt to rename columns to match expected format
+            action_plan_df.columns = [col.strip() for col in action_plan_df.columns]
             action_plan_df = action_plan_df.rename(columns={
                 "Numéro d'exigence": "Numéro d'exigence",
                 "Exigence IFS Food 8": "Exigence IFS Food 8",
                 "Notation": "Notation",
-                "Explication (par l'auditeur/l'évaluateur)": "Explication (par l’auditeur/l’évaluateur)",
-                "Correction (par l'entreprise)": "Correction proposée",
-                "Action corrective (par l'entreprise)": "Action corrective proposée"
+                "Explication (par l’auditeur/l’évaluateur)": "Explication (par l’auditeur/l’évaluateur)",
+                "Correction (par l’entreprise)": "Correction proposée",
+                "Action corrective (par l’entreprise)": "Action corrective proposée"
             })
             
             # Selecting expected columns
@@ -219,6 +222,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
