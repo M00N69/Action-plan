@@ -90,16 +90,22 @@ def load_action_plan(uploaded_file):
             temp_df = pd.read_excel(uploaded_file, header=None)
             
             # Identify the correct header row (adjust the index based on actual header location)
-            header_row_index = 12  # Adjust this index based on your file structure
+            header_row_index = 0  # Ajusté selon les colonnes trouvées
             action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
             
-            # Correct column names
-            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l'auditeur/l'évaluateur)"]
-            if all(col in action_plan_df.columns for col in expected_columns):
-                action_plan_df = action_plan_df[expected_columns]
-            else:
-                st.error(f"Les colonnes attendues ne sont pas présentes dans le fichier. Colonnes trouvées: {action_plan_df.columns.tolist()}")
-                return None
+            # Renommage des colonnes pour correspondre au format attendu
+            action_plan_df = action_plan_df.rename(columns={
+                "Numéro d'exigence": "Numéro d'exigence",
+                "Exigence IFS Food 8": "Exigence IFS Food 8",
+                "Notation": "Notation",
+                "Explication (par l'auditeur/l'évaluateur)": "Explication (par l'auditeur/l'évaluateur)",
+                "Correction (par l'entreprise)": "Correction proposée",
+                "Action corrective (par l'entreprise)": "Action corrective proposée"
+            })
+            
+            # Sélection des colonnes attendues
+            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l'auditeur/l'évaluateur)", "Correction proposée", "Action corrective proposée"]
+            action_plan_df = action_plan_df[expected_columns]
 
             return action_plan_df
         except Exception as e:
