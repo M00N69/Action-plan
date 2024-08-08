@@ -94,7 +94,7 @@ def load_action_plan(uploaded_file):
             action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
             
             # Correct column names
-            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
+            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l'auditeur/l'évaluateur)"]
             if all(col in action_plan_df.columns for col in expected_columns):
                 action_plan_df = action_plan_df[expected_columns]
             else:
@@ -110,7 +110,7 @@ def prepare_prompt(action_plan_df, guide_text):
     prompt = "Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. J'ai un plan d'action IFS Food 8.\n"
     for _, row in action_plan_df.iterrows():
         requirement_text = row["Exigence IFS Food 8"]
-        non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+        non_conformity_text = row["Explication (par l'auditeur/l'évaluateur)"]
         prompt += f"""
         Une non-conformité a été trouvée pour l'exigence suivante:
         {requirement_text}
