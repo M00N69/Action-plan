@@ -12,40 +12,19 @@ def add_css_styles():
     st.markdown(
         """
         <style>
-        .table-container {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            max-width: 100%;
+        .recommendation-container {
+            margin-bottom: 20px;
+            padding: 10px;
             border: 1px solid #ddd;
-            background-color: #29292F; /* Fond sombre */
+            border-radius: 5px;
+            background-color: #f9f9f9;
         }
-
-        th, td {
-            border: 1px solid #ddd;
-            text-align: left;
-            padding: 8px;
-            color: #fff; /* Texte blanc */
-            white-space: pre-wrap; /* Retour à la ligne automatique */
-        }
-
-        tr:nth-child(even) {
-            background-color: #333; /* Ligne paire plus foncée */
-        }
-
-        th {
-            background-color: #333; /* En-têtes plus foncés */
+        .recommendation-title {
             font-weight: bold;
+            font-size: 16px;
         }
-
-        .dataframe-container {
-            display: flex;
-            justify-content: center;
-            width: 100%;
+        .recommendation-section {
+            margin-bottom: 10px;
         }
         </style>
         """,
@@ -176,27 +155,21 @@ def parse_recommendations(text):
     
     return recommendations
 
-def dataframe_to_html(df):
-    return df.to_html(classes='dataframe table-container', escape=False, index=False)
-
-def generate_table(recommendations, action_plan_df):
-    st.write(f"Generated Recommendations: {recommendations}")  # Debugging line
-    if len(recommendations) != len(action_plan_df):
-        st.error(f"Le nombre de recommandations générées ({len(recommendations)}) ne correspond pas au nombre de non-conformités ({len(action_plan_df)}).")
-        return
-    
-    recommendations_df = pd.DataFrame(recommendations)
-    recommendations_df.insert(0, "Description de la non-conformité", action_plan_df["Explication (par l’auditeur/l’évaluateur)"].values)
-    recommendations_df.insert(0, "Exigence IFS Food 8", action_plan_df["Exigence IFS Food 8"].values)
-    
-    st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
-    csv = recommendations_df.to_csv(index=False)
-    st.download_button(
-        label="Télécharger les Recommandations",
-        data=csv,
-        file_name="recommendations.csv",
-        mime="text/csv",
-    )
+def display_recommendations(recommendations, action_plan_df):
+    for index, (i, row) in enumerate(action_plan_df.iterrows()):
+        st.markdown('<div class="recommendation-container">', unsafe_allow_html=True)
+        st.markdown(f'<div class="recommendation-title">Non-conformité {index + 1} : {row["Exigence IFS Food 8"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="recommendation-section"><b>Description de la non-conformité :</b> {row["Explication (par l’auditeur/l’évaluateur)"]}</div>', unsafe_allow_html=True)
+        
+        if index < len(recommendations):
+            rec = recommendations[index]
+            st.markdown(f'<div class="recommendation-section"><b>Correction proposée :</b> {rec["Correction proposée"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="recommendation-section"><b>Preuves potentielles :</b> {rec["Preuves potentielles"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="recommendation-section"><b>Actions correctives :</b> {rec["Actions correctives"]}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("Recommandation manquante pour cette non-conformité.")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def main():
     add_css_styles()
@@ -219,7 +192,7 @@ def main():
                 prompt = prepare_prompt(action_plan_df)
                 recommendations = get_ai_recommendations(prompt, model)
                 st.subheader("Recommandations de l'IA")
-                generate_table(recommendations, action_plan_df)
+                display_recommendations(recommendations, action_plan_df)
 
 if __name__ == "__main__":
     main()
