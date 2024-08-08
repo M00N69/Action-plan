@@ -209,17 +209,12 @@ def main():
                 # Display the table
                 st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
 
-                # Add a container for the button
-                button_container = st.container()
+                if st.button("Obtenir des recommandations de l'IA"):
+                    st.write("Bouton cliqué")  # Ajout de message de débogage
+                    st.session_state.action_plan_df = action_plan_df
+                    st.session_state.page = 2
 
-                # Move the button to the top of the container
-                with button_container:
-                    if st.button("Obtenir des recommandations de l'IA"):
-                        st.write("Bouton cliqué")  # Ajout de message de débogage
-                        st.session_state.action_plan_df = action_plan_df
-                        st.session_state.page = 2
-
-    elif st.session_state.page == 2:
+    if st.session_state.page == 2:
         st.write("Chargement de la page 2")  # Ajout de message de débogage
         # Check if action_plan_df is in the session state before trying to use it
         if "action_plan_df" in st.session_state:
