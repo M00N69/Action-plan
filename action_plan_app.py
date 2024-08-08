@@ -89,12 +89,12 @@ def load_action_plan(uploaded_file):
         try:
             # Load the file without specifying header to inspect column names
             temp_df = pd.read_excel(uploaded_file, header=None)
-            st.write("Colonnes du fichier chargé:", temp_df.head(5))
+           
             
             # Identify the correct header row (adjust the index based on actual header location)
             header_row_index = 12  # Adjust this index based on your file structure
             action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
-            st.write("Colonnes après ajustement du header:", action_plan_df.columns.tolist())
+           
 
             # Attempt to rename columns to match expected format
             action_plan_df.columns = [col.strip() for col in action_plan_df.columns]
