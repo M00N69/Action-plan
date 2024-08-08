@@ -186,7 +186,6 @@ def main():
                 if st.button("Obtenir des recommandations de l'IA"):
                     st.session_state.action_plan_df = action_plan_df
                     st.session_state.page = 2
-                    st.experimental_rerun()
     elif st.session_state.page == 2:
         action_plan_df = st.session_state.action_plan_df
         
@@ -211,7 +210,6 @@ def main():
             )
         if st.button("Retour"):
             st.session_state.page = 1
-            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
