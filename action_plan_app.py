@@ -90,21 +90,21 @@ def load_action_plan(uploaded_file):
             temp_df = pd.read_excel(uploaded_file, header=None)
             
             # Identify the correct header row (adjust the index based on actual header location)
-            header_row_index = 0  # Ajusté selon les colonnes trouvées
+            header_row_index = 0  # Adjusted based on found columns
             action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
             
-            # Renommage des colonnes pour correspondre au format attendu
+            # Renaming columns to match expected format
             action_plan_df = action_plan_df.rename(columns={
                 "Numéro d'exigence": "Numéro d'exigence",
                 "Exigence IFS Food 8": "Exigence IFS Food 8",
                 "Notation": "Notation",
-                "Explication (par l'auditeur/l'évaluateur)": "Explication (par l'auditeur/l'évaluateur)",
+                "Explication (par l'auditeur/l'évaluateur)": "Explication (par l’auditeur/l’évaluateur)",
                 "Correction (par l'entreprise)": "Correction proposée",
                 "Action corrective (par l'entreprise)": "Action corrective proposée"
             })
             
-            # Sélection des colonnes attendues
-            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l'auditeur/l'évaluateur)", "Correction proposée", "Action corrective proposée"]
+            # Selecting expected columns
+            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)", "Correction proposée", "Action corrective proposée"]
             action_plan_df = action_plan_df[expected_columns]
 
             return action_plan_df
@@ -116,7 +116,7 @@ def prepare_prompt(action_plan_df, guide_text):
     prompt = "Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. J'ai un plan d'action IFS Food 8.\n"
     for _, row in action_plan_df.iterrows():
         requirement_text = row["Exigence IFS Food 8"]
-        non_conformity_text = row["Explication (par l'auditeur/l'évaluateur)"]
+        non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
         prompt += f"""
         Une non-conformité a été trouvée pour l'exigence suivante:
         {requirement_text}
@@ -219,6 +219,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
