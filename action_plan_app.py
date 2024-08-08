@@ -87,7 +87,15 @@ def load_document_from_github(url):
 def load_action_plan(uploaded_file):
     if uploaded_file is not None:
         try:
-            action_plan_df = pd.read_excel(uploaded_file, header=0)  # Assuming the header is in the first row
+            # First, read the file without specifying header row to inspect column names
+            temp_df = pd.read_excel(uploaded_file)
+            st.write("Colonnes du fichier chargé:", temp_df.columns.tolist())
+
+            # Adjust this according to the actual header row after inspection
+            action_plan_df = pd.read_excel(uploaded_file, header=12)  # Adjust the header row if needed
+            st.write("Colonnes après ajustement du header:", action_plan_df.columns.tolist())
+
+            # Columns to keep (adjust according to actual column names)
             columns_to_keep = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
             action_plan_df = action_plan_df[columns_to_keep]
             return action_plan_df
@@ -185,6 +193,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
