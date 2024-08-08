@@ -174,6 +174,9 @@ def parse_recommendations(text):
         st.error(f"Erreur lors de l'analyse des recommandations: {str(e)}")
         return []
 
+def dataframe_to_html(df):
+    return df.to_html(classes='dataframe table-container', escape=False, index=False)
+
 def main():
     add_css_styles()
 
