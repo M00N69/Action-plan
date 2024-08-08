@@ -213,12 +213,10 @@ def main():
                 # Move the button to the top of the container
                 with button_container:
                     if st.button("Obtenir des recommandations de l'IA"):
-                        print("Button clicked")  # Add this line
                         st.session_state.action_plan_df = action_plan_df
                         st.session_state.page = 2
 
     elif st.session_state.page == 2:
-        print("Page 2")  # Add this line
         # Check if action_plan_df is in the session state before trying to use it
         if "action_plan_df" in st.session_state:
             action_plan_df = st.session_state.action_plan_df
