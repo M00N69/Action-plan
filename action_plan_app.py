@@ -144,26 +144,36 @@ def get_ai_recommendations(prompt, model):
 
 def parse_recommendations(text):
     recommendations = []
-    blocks = text.split("\n\n")
-    st.write(f"Blocks: {blocks}")  # Debugging line
-    for block in blocks:
-        lines = block.split("\n")
-        correction = ""
-        preuves = ""
-        actions = ""
-        for line in lines:
-            if line.startswith("**Correction proposée**:"):
-                correction = line.replace("**Correction proposée**:", "").strip()
-            elif line.startswith("**Preuves potentielles**:"):
-                preuves = line.replace("**Preuves potentielles**:", "").strip()
-            elif line.startswith("**Actions correctives**:"):
-                actions = line.replace("**Actions correctives**:", "").strip()
-        if correction or preuves or actions:
-            recommendations.append({
-                "Correction proposée": correction,
-                "Preuves potentielles": preuves,
-                "Actions correctives": actions
-            })
+    sections = text.split("Non-conformité")
+    for section in sections:
+        if section.strip():
+            correction = ""
+            preuves = ""
+            actions = ""
+            correction_found = False
+            preuves_found = False
+            actions_found = False
+            for line in section.split("\n"):
+                line = line.strip()
+                if line.startswith("Correction proposée:"):
+                    correction = line.replace("Correction proposée:", "").strip()
+                    correction_found = True
+                elif line.startswith("Preuves potentielles:"):
+                    preuves = line.replace("Preuves potentielles:", "").strip()
+                    preuves_found = True
+                elif line.startswith("Actions correctives:"):
+                    actions = line.replace("Actions correctives:", "").strip()
+                    actions_found = True
+            
+            if correction_found and preuves_found and actions_found:
+                recommendations.append({
+                    "Correction proposée": correction,
+                    "Preuves potentielles": preuves,
+                    "Actions correctives": actions
+                })
+            else:
+                st.warning(f"Recommandation incomplète détectée : {section}")
+    
     return recommendations
 
 def dataframe_to_html(df):
