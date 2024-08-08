@@ -5,7 +5,6 @@ import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 import time
 
-# Fonction pour ajouter des styles CSS
 def add_css_styles():
     st.markdown(
         """
@@ -28,6 +27,7 @@ def add_css_styles():
             text-align: left;
             padding: 8px;
             color: #fff; /* Texte blanc */
+            white-space: pre-wrap; /* Retour à la ligne automatique */
         }
 
         tr:nth-child(even) {
@@ -39,29 +39,9 @@ def add_css_styles():
             font-weight: bold;
         }
 
-        a {
-            color: #3080F8; /* Bleu clair pour les liens */
-            text-decoration: none; /* Supprimer le soulignement par défaut */
-        }
-
-        a:hover {
-            text-decoration: underline; /* Soulignement au survol */
-        }
-
-        .analyze-button {
-            padding: 4px 8px;
-            color: #fff;
-            background-color: #3080F8;
-            border: none;
-            cursor: pointer;
-        }
-
-        .analyze-button:hover {
-            background-color: #1A5BB1;
-        }
-
-        .dataframe td {
-            white-space: pre-wrap; /* Retour à la ligne automatique */
+        .dataframe-container {
+            display: flex;
+            justify-content: center;
         }
         </style>
         """,
@@ -198,6 +178,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
