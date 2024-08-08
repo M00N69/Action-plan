@@ -87,17 +87,23 @@ def load_document_from_github(url):
 def load_action_plan(uploaded_file):
     if uploaded_file is not None:
         try:
-            # First, read the file without specifying header row to inspect column names
-            temp_df = pd.read_excel(uploaded_file)
-            st.write("Colonnes du fichier chargé:", temp_df.columns.tolist())
-
-            # Adjust this according to the actual header row after inspection
-            action_plan_df = pd.read_excel(uploaded_file, header=0)  # Adjust the header row if needed
+            # Load the file without specifying header to inspect column names
+            temp_df = pd.read_excel(uploaded_file, header=None)
+            st.write("Colonnes du fichier chargé:", temp_df.iloc[0].tolist())
+            
+            # Identify the correct header row (adjust the index based on actual header location)
+            header_row_index = 12  # Adjust this index based on your file structure
+            action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
             st.write("Colonnes après ajustement du header:", action_plan_df.columns.tolist())
 
-            # Columns to keep (adjust according to actual column names)
-            columns_to_keep = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
-            action_plan_df = action_plan_df[columns_to_keep]
+            # Correct column names
+            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
+            if all(col in action_plan_df.columns for col in expected_columns):
+                action_plan_df = action_plan_df[expected_columns]
+            else:
+                st.error(f"Les colonnes attendues ne sont pas présentes dans le fichier. Colonnes trouvées: {action_plan_df.columns.tolist()}")
+                return None
+
             return action_plan_df
         except Exception as e:
             st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
