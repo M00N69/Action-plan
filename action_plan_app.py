@@ -193,61 +193,44 @@ def main():
     st.image('https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/visipilot%20banner.PNG', use_column_width=True)
     st.title("Assistant VisiPilot pour Plan d'Actions IFS")
 
-    # Use session state to manage the flow between pages
-    if "page" not in st.session_state:
-        st.session_state.page = 1
+    st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
+    uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
 
-    st.write(f"Page actuelle : {st.session_state.page}")  # Ajout de message de débogage
+    if uploaded_file:
+        st.write("Fichier téléchargé avec succès")  # Ajout de message de débogage
+        action_plan_df = load_action_plan(uploaded_file)
+        if action_plan_df is not None:
+            # Display the table
+            st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
 
-    if st.session_state.page == 1:
-        st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
-        uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
-        if uploaded_file:
-            st.write("Fichier téléchargé avec succès")  # Ajout de message de débogage
-            action_plan_df = load_action_plan(uploaded_file)
-            if action_plan_df is not None:
-                # Display the table
-                st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
+            if st.button("Obtenir des recommandations de l'IA"):
+                st.write("Bouton cliqué")  # Ajout de message de débogage
+                st.session_state.action_plan_df = action_plan_df
 
-                if st.button("Obtenir des recommandations de l'IA"):
-                    st.write("Bouton cliqué")  # Ajout de message de débogage
-                    st.session_state.action_plan_df = action_plan_df
-                    st.session_state.page = 2
+                # Load the guide document for reference
+                guide_url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
+                guide_text = load_document_from_github(guide_url)
+                if guide_text is not None:
+                    model = configure_model(guide_text)
+                    prompt = prepare_prompt(action_plan_df, guide_text)
 
-    if st.session_state.page == 2:
-        st.write("Chargement de la page 2")  # Ajout de message de débogage
-        # Check if action_plan_df is in the session state before trying to use it
-        if "action_plan_df" in st.session_state:
-            action_plan_df = st.session_state.action_plan_df
+                    # Add a spinner while the recommendations are being generated
+                    with st.spinner("Génération des recommandations de l'IA..."):
+                        recommendations = get_ai_recommendations(prompt, model)
 
-            # Load the guide document for reference
-            guide_url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
-            guide_text = load_document_from_github(guide_url)
-            if guide_text is not None:
-                model = configure_model(guide_text)
-                prompt = prepare_prompt(action_plan_df, guide_text)
+                    # Display the recommendations table
+                    st.subheader("Recommandations de l'IA")
+                    recommendations_df = pd.DataFrame(recommendations)
+                    st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
 
-                # Add a spinner while the recommendations are being generated
-                with st.spinner("Génération des recommandations de l'IA..."):
-                    recommendations = get_ai_recommendations(prompt, model)
-
-                # Display the recommendations table
-                st.subheader("Recommandations de l'IA")
-                recommendations_df = pd.DataFrame(recommendations)
-                st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
-
-                # Add a download button for the recommendations
-                csv = recommendations_df.to_csv(index=False)
-                st.download_button(
-                    label="Télécharger les Recommandations",
-                    data=csv,
-                    file_name="recommendations.csv",
-                    mime="text/csv",
-                )
-
-        # Add a button to go back to the first page
-        if st.button("Retour"):
-            st.session_state.page = 1
+                    # Add a download button for the recommendations
+                    csv = recommendations_df.to_csv(index=False)
+                    st.download_button(
+                        label="Télécharger les Recommandations",
+                        data=csv,
+                        file_name="recommendations.csv",
+                        mime="text/csv",
+                    )
 
 if __name__ == "__main__":
     main()
