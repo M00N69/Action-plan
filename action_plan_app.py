@@ -54,10 +54,7 @@ def add_css_styles():
         }
 
         .spinner {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100px;
+            display: flex;justify-content: center;align-items: center;height: 100px;
         }
         </style>
         """,
@@ -162,7 +159,6 @@ def get_ai_recommendations(prompt, model):
     return recommendations
 
 def parse_recommendations(text):
-    # Add error handling to handle cases where the text is not in the expected format
     try:
         recommendations = []
         parts = text.split("\n\n")
@@ -234,7 +230,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
