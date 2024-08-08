@@ -5,6 +5,69 @@ import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 import time
 
+# Fonction pour ajouter des styles CSS
+def add_css_styles():
+    st.markdown(
+        """
+        <style>
+        .table-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        table {
+            border-collapse: collapse;
+            width: 80%;
+            max-width: 1200px;
+            border: 1px solid #ddd;
+            background-color: #29292F; /* Fond sombre */
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            text-align: left;
+            padding: 8px;
+            color: #fff; /* Texte blanc */
+        }
+
+        tr:nth-child(even) {
+            background-color: #333; /* Ligne paire plus foncée */
+        }
+
+        th {
+            background-color: #333; /* En-têtes plus foncés */
+            font-weight: bold;
+        }
+
+        a {
+            color: #3080F8; /* Bleu clair pour les liens */
+            text-decoration: none; /* Supprimer le soulignement par défaut */
+        }
+
+        a:hover {
+            text-decoration: underline; /* Soulignement au survol */
+        }
+
+        .analyze-button {
+            padding: 4px 8px;
+            color: #fff;
+            background-color: #3080F8;
+            border: none;
+            cursor: pointer;
+        }
+
+        .analyze-button:hover {
+            background-color: #1A5BB1;
+        }
+
+        .dataframe td {
+            white-space: pre-wrap; /* Retour à la ligne automatique */
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
 # Configure the GenAI model
 def configure_model(document_text):
     genai.configure(api_key=st.secrets["api_key"])
@@ -30,7 +93,6 @@ def configure_model(document_text):
 
 @st.cache_data(ttl=86400)
 def load_document_from_github(url):
-    """Load a document from GitHub."""
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -40,9 +102,10 @@ def load_document_from_github(url):
         return None
 
 def load_action_plan(uploaded_file):
-    """Load the user-uploaded action plan."""
     if uploaded_file is not None:
-        action_plan_df = pd.read_excel(uploaded_file, header=12)  # header=12 to skip the first 12 rows
+        action_plan_df = pd.read_excel(uploaded_file, header=12)
+        columns_to_keep = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
+        action_plan_df = action_plan_df[columns_to_keep]
         return action_plan_df
     return None
 
@@ -70,7 +133,6 @@ def prepare_prompts(action_plan_df):
     return prompts
 
 def get_ai_recommendations(prompts, model):
-    """Generate AI recommendations using GenAI."""
     recommendations = []
     for prompt in prompts:
         try:
@@ -78,18 +140,24 @@ def get_ai_recommendations(prompts, model):
             response = convo.send_message(prompt)
             corrective_actions = response.text
             recommendations.append(parse_recommendation(corrective_actions))
-            time.sleep(2)  # Temporiser pour éviter l'épuisement des ressources
+            time.sleep(2)
         except ResourceExhausted:
             st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
             break
         except Exception as e:
             st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-            recommendations.append({"Correction proposée": "Erreur lors de la génération de la recommandation"})
+            recommendations.append({
+                "Correction proposée": "Erreur lors de la génération de la recommandation",
+                "Plan d'action": "",
+                "Preuves": ""
+            })
     return recommendations
 
 def parse_recommendation(text):
-    # Placeholder pour l'analyse des recommandations
-    correction, plan_action, preuves = text.split('\n\n', 2)
+    parts = text.split('\n\n', 2)
+    correction = parts[0] if len(parts) > 0 else "Pas de correction disponible"
+    plan_action = parts[1] if len(parts) > 1 else "Pas de plan d'action disponible"
+    preuves = parts[2] if len(parts) > 2 else "Pas de preuves disponibles"
     return {
         "Correction proposée": correction,
         "Plan d'action": plan_action,
@@ -97,12 +165,13 @@ def parse_recommendation(text):
     }
 
 def generate_table(recommendations):
-    """Generate a Streamlit table with recommendations."""
     recommendations_df = pd.DataFrame(recommendations)
+    st.markdown('<div class="table-container">', unsafe_allow_html=True)
     st.dataframe(recommendations_df.style.set_properties(**{
         'white-space': 'pre-wrap',
         'text-align': 'left'
     }))
+    st.markdown('</div>', unsafe_allow_html=True)
     csv = recommendations_df.to_csv(index=False)
     st.download_button(
         label="Télécharger les Recommandations",
@@ -112,7 +181,8 @@ def generate_table(recommendations):
     )
 
 def main():
-    """Main function for the Streamlit app."""
+    add_css_styles()
+    
     st.image('https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/visipilot%20banner.PNG', use_column_width=True)
     st.title("Assistant VisiPilot pour Plan d'Actions IFS")
     st.write("Cet outil vous aide à gérer votre plan d'action IFS Food 8 avec l'aide de l'IA.")
@@ -122,10 +192,13 @@ def main():
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.dataframe(action_plan_df.style.set_properties(**{
                 'white-space': 'pre-wrap',
                 'text-align': 'left'
             }))
+            st.markdown('</div>', unsafe_allow_html=True)
+            
             url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
             document_text = load_document_from_github(url)
             if document_text:
@@ -137,6 +210,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
