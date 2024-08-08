@@ -159,6 +159,10 @@ def dataframe_to_html(df):
     return df.to_html(classes='dataframe table-container', escape=False, index=False)
 
 def generate_table(recommendations, action_plan_df):
+    if len(recommendations) != len(action_plan_df):
+        st.error("Le nombre de recommandations générées ne correspond pas au nombre de non-conformités.")
+        return
+    
     recommendations_df = pd.DataFrame(recommendations)
     recommendations_df.insert(0, "Description de la non-conformité", action_plan_df["Explication (par l’auditeur/l’évaluateur)"].values)
     recommendations_df.insert(0, "Exigence IFS Food 8", action_plan_df["Exigence IFS Food 8"].values)
