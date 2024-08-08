@@ -54,15 +54,18 @@ def add_css_styles():
         }
 
         .spinner {
-            display: flex;justify-content: center;align-items: center;height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100px;
         }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-def configure_model(document_text):
-    genai.configure(api_key=st.secrets["api_key"])
+def configure_model(api_key, document_text):
+    genai.configure(api_key=api_key)
     generation_config = {
         "temperature": 2,
         "top_p": 0.4,
@@ -83,7 +86,6 @@ def configure_model(document_text):
     )
     return model
 
-@st.cache_data(ttl=86400)
 def load_document_from_github(url):
     try:
         return pd.read_csv(url)  # Load CSV file into DataFrame
@@ -92,32 +94,31 @@ def load_document_from_github(url):
         return None
 
 def load_action_plan(uploaded_file):
-    if uploaded_file is not None:
-        try:
-            # Load the file without specifying header to inspect column names
-            temp_df = pd.read_excel(uploaded_file, header=None)
+    try:
+        # Load the file without specifying header to inspect column names
+        temp_df = pd.read_excel(uploaded_file, header=None)
 
-            # Identify the correct header row (adjust the index based on actual header location)
-            header_row_index = 12  # Adjust this index based on your file structure
-            action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
+        # Identify the correct header row (adjust the index based on actual header location)
+        header_row_index = 12  # Adjust this index based on your file structure
+        action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
 
-            # Attempt to rename columns to match expected format
-            action_plan_df.columns = [col.strip() for col in action_plan_df.columns]
-            action_plan_df = action_plan_df.rename(columns={
-                "Numéro d'exigence": "Numéro d'exigence",
-                "Exigence IFS Food 8": "Exigence IFS Food 8",
-                "Notation": "Notation",
-                "Explication (par l’auditeur/l’évaluateur)": "Explication (par l’auditeur/l’évaluateur)"
-            })
+        # Attempt to rename columns to match expected format
+        action_plan_df.columns = [col.strip() for col in action_plan_df.columns]
+        action_plan_df = action_plan_df.rename(columns={
+            "Numéro d'exigence": "Numéro d'exigence",
+            "Exigence IFS Food 8": "Exigence IFS Food 8",
+            "Notation": "Notation",
+            "Explication (par l’auditeur/l’évaluateur)": "Explication (par l’auditeur/l’évaluateur)"
+        })
 
-            # Selecting expected columns
-            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
-            action_plan_df = action_plan_df[expected_columns]
+        # Selecting expected columns
+        expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
+        action_plan_df = action_plan_df[expected_columns]
 
-            return action_plan_df
-        except Exception as e:
-            st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
-    return None
+        return action_plan_df
+    except Exception as e:
+        st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
+        return None
 
 def prepare_prompt(action_plan_df, guide_text):
     prompt = "Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. J'ai un plan d'action IFS Food 8.\n"
@@ -139,24 +140,17 @@ def prepare_prompt(action_plan_df, guide_text):
     return prompt
 
 def get_ai_recommendations(prompt, model):
-    recommendations = []
     try:
         convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
         response = convo.send_message(prompt)
         recommendations_text = response.text
-        recommendations = parse_recommendations(recommendations_text)
+        return parse_recommendations(recommendations_text)
     except ResourceExhausted:
         st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
+        return []
     except Exception as e:
         st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-        recommendations.append({
-            "Exigence IFS Food 8": "",
-            "Non-conformité #": "Erreur lors de la génération de la recommandation",
-            "Correction proposée": "",
-            "Preuve possible": "",
-            "Action corrective proposée": ""
-        })
-    return recommendations
+        return []
 
 def parse_recommendations(text):
     try:
@@ -180,9 +174,6 @@ def parse_recommendations(text):
         st.error(f"Erreur lors de l'analyse des recommandations: {str(e)}")
         return []
 
-def dataframe_to_html(df):
-    return df.to_html(classes='dataframe table-container', escape=False, index=False)
-
 def main():
     add_css_styles()
 
@@ -193,33 +184,25 @@ def main():
     uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
 
     if uploaded_file:
-        st.write("Fichier téléchargé avec succès")  # Ajout de message de débogage
+        st.write("Fichier téléchargé avec succès")
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
-            # Display the table
             st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
 
             if st.button("Obtenir des recommandations de l'IA"):
-                st.write("Bouton cliqué")  # Ajout de message de débogage
-                st.session_state.action_plan_df = action_plan_df
-
-                # Load the guide document for reference
+                st.write("Bouton cliqué")
                 guide_url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
                 guide_text = load_document_from_github(guide_url)
                 if guide_text is not None:
-                    model = configure_model(guide_text)
+                    model = configure_model(st.secrets["api_key"], guide_text)
                     prompt = prepare_prompt(action_plan_df, guide_text)
-
-                    # Add a spinner while the recommendations are being generated
                     with st.spinner("Génération des recommandations de l'IA..."):
                         recommendations = get_ai_recommendations(prompt, model)
 
-                    # Display the recommendations table
                     st.subheader("Recommandations de l'IA")
                     recommendations_df = pd.DataFrame(recommendations)
                     st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
 
-                    # Add a download button for the recommendations
                     csv = recommendations_df.to_csv(index=False)
                     st.download_button(
                         label="Télécharger les Recommandations",
