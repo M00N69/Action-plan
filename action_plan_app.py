@@ -55,10 +55,10 @@ def add_css_styles():
 def configure_model(document_text):
     genai.configure(api_key=st.secrets["api_key"])
     generation_config = {
-        "temperature": 2,
-        "top_p": 0.4,
-        "top_k": 32,
-        "max_output_tokens": 8192,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "top_k": 50,
+        "max_output_tokens": 1024,
     }
     safety_settings = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -113,13 +113,13 @@ def prepare_prompt(action_plan_df):
     for _, row in action_plan_df.iterrows():
         requirement_text = row["Exigence IFS Food 8"]
         non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
-        prompt += f"1. **Exigence IFS Food 8**: {requirement_text}\n"
-        prompt += f"   **Description de la non-conformité**: {non_conformity_text}\n\n"
+        prompt += f"**Exigence IFS Food 8**: {requirement_text}\n"
+        prompt += f"**Description de la non-conformité**: {non_conformity_text}\n\n"
     
     prompt += "Répondez en utilisant le format suivant pour chaque non-conformité :\n\n"
-    prompt += "1. **Correction proposée**: \n   * {correction_proposée}\n\n"
-    prompt += "2. **Preuves potentielles**: \n   * {preuves_potentielles}\n\n"
-    prompt += "3. **Actions correctives**: \n   * {actions_correctives}\n\n"
+    prompt += "**Correction proposée**: {correction_proposée}\n\n"
+    prompt += "**Preuves potentielles**: {preuves_potentielles}\n\n"
+    prompt += "**Actions correctives**: {actions_correctives}\n\n"
     prompt += "Référez-vous au Guide IFS Food 8 pour des preuves et des recommandations appropriées."
     return prompt
 
@@ -143,15 +143,23 @@ def get_ai_recommendations(prompt, model):
 
 def parse_recommendations(text):
     recommendations = []
-    parts = text.split("\n\n")
-    for i in range(0, len(parts), 3):
-        correction = parts[i] if i < len(parts) else "Pas de correction disponible"
-        plan_action = parts[i+1] if i+1 < len(parts) else "Pas de plan d'action disponible"
-        preuves = parts[i+2] if i+2 < len(parts) else "Pas de preuves disponibles"
+    blocks = text.split("\n\n")
+    for block in blocks:
+        lines = block.split("\n")
+        correction = ""
+        preuves = ""
+        actions = ""
+        for line in lines:
+            if line.startswith("**Correction proposée**:"):
+                correction = line.replace("**Correction proposée**:", "").strip()
+            elif line.startswith("**Preuves potentielles**:"):
+                preuves = line.replace("**Preuves potentielles**:", "").strip()
+            elif line.startswith("**Actions correctives**:"):
+                actions = line.replace("**Actions correctives**:", "").strip()
         recommendations.append({
             "Correction proposée": correction,
-            "Plan d'action": plan_action,
-            "Preuves": preuves
+            "Preuves potentielles": preuves,
+            "Actions correctives": actions
         })
     return recommendations
 
@@ -201,6 +209,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
