@@ -136,8 +136,8 @@ def get_ai_recommendations(prompt, model):
         st.error(f"Une erreur inattendue s'est produite: {str(e)}")
         recommendations.append({
             "Correction proposée": "Erreur lors de la génération de la recommandation",
-            "Plan d'action": "",
-            "Preuves": ""
+            "Preuves potentielles": "",
+            "Actions correctives": ""
         })
     return recommendations
 
@@ -156,11 +156,12 @@ def parse_recommendations(text):
                 preuves = line.replace("**Preuves potentielles**:", "").strip()
             elif line.startswith("**Actions correctives**:"):
                 actions = line.replace("**Actions correctives**:", "").strip()
-        recommendations.append({
-            "Correction proposée": correction,
-            "Preuves potentielles": preuves,
-            "Actions correctives": actions
-        })
+        if correction or preuves or actions:
+            recommendations.append({
+                "Correction proposée": correction,
+                "Preuves potentielles": preuves,
+                "Actions correctives": actions
+            })
     return recommendations
 
 def dataframe_to_html(df):
@@ -168,7 +169,7 @@ def dataframe_to_html(df):
 
 def generate_table(recommendations, action_plan_df):
     if len(recommendations) != len(action_plan_df):
-        st.error("Le nombre de recommandations générées ne correspond pas au nombre de non-conformités.")
+        st.error(f"Le nombre de recommandations générées ({len(recommendations)}) ne correspond pas au nombre de non-conformités ({len(action_plan_df)}).")
         return
     
     recommendations_df = pd.DataFrame(recommendations)
