@@ -92,7 +92,7 @@ def load_action_plan(uploaded_file):
             st.write("Colonnes du fichier chargé:", temp_df.columns.tolist())
 
             # Adjust this according to the actual header row after inspection
-            action_plan_df = pd.read_excel(uploaded_file, header=12)  # Adjust the header row if needed
+            action_plan_df = pd.read_excel(uploaded_file, header=0)  # Adjust the header row if needed
             st.write("Colonnes après ajustement du header:", action_plan_df.columns.tolist())
 
             # Columns to keep (adjust according to actual column names)
