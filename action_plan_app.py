@@ -20,7 +20,7 @@ def add_css_styles():
         table {
             border-collapse: collapse;
             width: 100%;
-            max-width: 1200px;
+            max-width: 100%;
             border: 1px solid #ddd;
             background-color: #29292F; /* Fond sombre */
         }
@@ -182,7 +182,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
