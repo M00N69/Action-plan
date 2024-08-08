@@ -164,6 +164,9 @@ def parse_recommendations(text):
     
     return recommendations
 
+def dataframe_to_html(df):
+    return df.to_html(classes='dataframe table-container', escape=False, index=False)
+
 def display_recommendations(recommendations, action_plan_df):
     for index, (i, row) in enumerate(action_plan_df.iterrows()):
         st.markdown('<div class="recommendation-container">', unsafe_allow_html=True)
