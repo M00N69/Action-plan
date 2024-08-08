@@ -46,60 +46,55 @@ def load_action_plan(uploaded_file):
         return action_plan_df
     return None
 
-def get_ai_recommendations(action_plan_df, model):
+def prepare_prompts(action_plan_df):
+    prompts = []
+    for _, row in action_plan_df.iterrows():
+        requirement_text = row["Exigence IFS Food 8"]
+        non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+        prompt = f"""
+        Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
+        J'ai un plan d'action IFS Food 8.
+        Une non-conformité a été trouvée pour l'exigence suivante:
+        {requirement_text}
+        
+        La description de la non-conformité est: {non_conformity_text}
+
+        Veuillez fournir:
+        1. Une correction proposée.
+        2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
+        3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
+
+        N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
+        """
+        prompts.append(prompt)
+    return prompts
+
+def get_ai_recommendations(prompts, model):
     """Generate AI recommendations using GenAI."""
     recommendations = []
-
-    required_columns = ["Exigence IFS Food 8", "Explication (par l’auditeur/l’évaluateur)", "Numéro d'exigence", "Notation"]
-
-    # Vérifier la présence des colonnes nécessaires
-    for col in required_columns:
-        if col not in action_plan_df.columns:
-            st.error(f"La colonne requise '{col}' est manquante dans le fichier téléchargé.")
-            st.write("Colonnes disponibles:", list(action_plan_df.columns))
-            return []
-
-    for idx, row in action_plan_df.iterrows():
+    for prompt in prompts:
         try:
-            requirement_text = row["Exigence IFS Food 8"]
-            non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
-            prompt = f"""
-            Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires.
-            J'ai un plan d'action IFS Food 8.
-            Une non-conformité a été trouvée pour l'exigence suivante:
-            {requirement_text}
-            
-            La description de la non-conformité est: {non_conformity_text}
-
-            Veuillez fournir:
-            1. Une correction proposée.
-            2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
-            3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8. 
-
-            N'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations.
-            """
             convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
             response = convo.send_message(prompt)
             corrective_actions = response.text
-            recommendations.append({
-                "Numéro d'exigence": row["Numéro d'exigence"],
-                "Exigence IFS Food 8": requirement_text,
-                "Notation": row["Notation"],
-                "Explication (par l’auditeur/l’évaluateur)": non_conformity_text,
-                "Correction proposée": corrective_actions,
-            })
-            # Temporiser entre les appels pour éviter l'épuisement des ressources
-            time.sleep(2)
-        except KeyError as e:
-            st.error(f"Colonne manquante dans le DataFrame: {e}")
-            st.write("Colonnes disponibles:", list(action_plan_df.columns))
+            recommendations.append(parse_recommendation(corrective_actions))
+            time.sleep(2)  # Temporiser pour éviter l'épuisement des ressources
         except ResourceExhausted:
             st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
             break
         except Exception as e:
             st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-            continue  # Continuer avec la prochaine ligne en cas d'erreur
+            recommendations.append({"Correction proposée": "Erreur lors de la génération de la recommandation"})
     return recommendations
+
+def parse_recommendation(text):
+    # Placeholder pour l'analyse des recommandations
+    correction, plan_action, preuves = text.split('\n\n', 2)
+    return {
+        "Correction proposée": correction,
+        "Plan d'action": plan_action,
+        "Preuves": preuves
+    }
 
 def generate_table(recommendations):
     """Generate a Streamlit table with recommendations."""
@@ -135,7 +130,8 @@ def main():
             document_text = load_document_from_github(url)
             if document_text:
                 model = configure_model(document_text)
-                recommendations = get_ai_recommendations(action_plan_df, model)
+                prompts = prepare_prompts(action_plan_df)
+                recommendations = get_ai_recommendations(prompts, model)
                 st.subheader("Recommandations de l'IA")
                 generate_table(recommendations)
 
