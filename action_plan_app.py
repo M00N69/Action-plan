@@ -104,22 +104,23 @@ def load_action_plan(uploaded_file):
     return None
 
 def prepare_prompt(action_plan_df):
-    prompt = "Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. J'ai un plan d'action IFS Food 8.\n"
+    prompt = "Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. J'ai un plan d'action IFS Food 8 contenant des non-conformités détectées. Pour chaque non-conformité, veuillez fournir les informations suivantes :\n\n"
+    prompt += "1. La correction proposée pour résoudre la non-conformité.\n"
+    prompt += "2. Les preuves potentielles pour soutenir la correction proposée.\n"
+    prompt += "3. Les actions correctives permettant d'éliminer les causes sous-jacentes de la non-conformité.\n\n"
+    prompt += "Voici les non-conformités détectées :\n\n"
+    
     for _, row in action_plan_df.iterrows():
         requirement_text = row["Exigence IFS Food 8"]
         non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
-        prompt += f"""
-        Une non-conformité a été trouvée pour l'exigence suivante:
-        {requirement_text}
-        
-        La description de la non-conformité est: {non_conformity_text}
-
-        Veuillez fournir:
-        1. Une correction proposée.
-        2. Un plan d'action pour corriger la non-conformité, avec une échéance suggérée.
-        3. Des preuves à l'appui de l'action proposée, en citant les sections du Guide IFS Food 8.
-        """
-    prompt += "\nN'oubliez pas de vous référer au Guide IFS Food 8 pour des preuves et des recommandations."
+        prompt += f"1. **Exigence IFS Food 8**: {requirement_text}\n"
+        prompt += f"   **Description de la non-conformité**: {non_conformity_text}\n\n"
+    
+    prompt += "Répondez en utilisant le format suivant pour chaque non-conformité :\n\n"
+    prompt += "1. **Correction proposée**: \n   * {correction_proposée}\n\n"
+    prompt += "2. **Preuves potentielles**: \n   * {preuves_potentielles}\n\n"
+    prompt += "3. **Actions correctives**: \n   * {actions_correctives}\n\n"
+    prompt += "Référez-vous au Guide IFS Food 8 pour des preuves et des recommandations appropriées."
     return prompt
 
 def get_ai_recommendations(prompt, model):
@@ -157,8 +158,11 @@ def parse_recommendations(text):
 def dataframe_to_html(df):
     return df.to_html(classes='dataframe table-container', escape=False, index=False)
 
-def generate_table(recommendations):
+def generate_table(recommendations, action_plan_df):
     recommendations_df = pd.DataFrame(recommendations)
+    recommendations_df.insert(0, "Description de la non-conformité", action_plan_df["Explication (par l’auditeur/l’évaluateur)"].values)
+    recommendations_df.insert(0, "Exigence IFS Food 8", action_plan_df["Exigence IFS Food 8"].values)
+    
     st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
     csv = recommendations_df.to_csv(index=False)
     st.download_button(
@@ -189,11 +193,10 @@ def main():
                 prompt = prepare_prompt(action_plan_df)
                 recommendations = get_ai_recommendations(prompt, model)
                 st.subheader("Recommandations de l'IA")
-                generate_table(recommendations)
+                generate_table(recommendations, action_plan_df)
 
 if __name__ == "__main__":
     main()
-
 
 
 
