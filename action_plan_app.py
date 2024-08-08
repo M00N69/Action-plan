@@ -47,11 +47,16 @@ def add_css_styles():
             justify-content: center;
             width: 100%;
         }
+
+        .st-df {
+            overflow-x: auto; /* Scroll horizontal si nécessaire */
+        }
         </style>
         """,
         unsafe_allow_html=True
     )
 
+# Configure the GenAI model
 def configure_model(document_text):
     genai.configure(api_key=st.secrets["api_key"])
     generation_config = {
@@ -67,7 +72,7 @@ def configure_model(document_text):
         {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
     ]
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
+        model_name="gemini-pro",
         generation_config=generation_config,
         system_instruction=document_text,
         safety_settings=safety_settings
@@ -86,21 +91,10 @@ def load_document_from_github(url):
 
 def load_action_plan(uploaded_file):
     if uploaded_file is not None:
-        try:
-            # First, read the file without specifying header row to inspect column names
-            temp_df = pd.read_excel(uploaded_file)
-            st.write("Colonnes du fichier chargé:", temp_df.columns.tolist())
-
-            # Adjust this according to the actual header row after inspection
-            action_plan_df = pd.read_excel(uploaded_file, header=0)  # Adjust the header row if needed
-            st.write("Colonnes après ajustement du header:", action_plan_df.columns.tolist())
-
-            # Columns to keep (adjust according to actual column names)
-            columns_to_keep = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
-            action_plan_df = action_plan_df[columns_to_keep]
-            return action_plan_df
-        except Exception as e:
-            st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
+        action_plan_df = pd.read_excel(uploaded_file, header=12)
+        columns_to_keep = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
+        action_plan_df = action_plan_df[columns_to_keep]
+        return action_plan_df
     return None
 
 def prepare_prompt(action_plan_df):
@@ -159,7 +153,7 @@ def dataframe_to_html(df):
 
 def generate_table(recommendations):
     recommendations_df = pd.DataFrame(recommendations)
-    st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="dataframe-container">{dataframe_to_html(recommendations_df)}</div>', unsafe_allow_html=True)
     csv = recommendations_df.to_csv(index=False)
     st.download_button(
         label="Télécharger les Recommandations",
@@ -180,7 +174,7 @@ def main():
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
-            st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dataframe-container">{dataframe_to_html(action_plan_df)}</div>', unsafe_allow_html=True)
             
             url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
             document_text = load_document_from_github(url)
@@ -193,8 +187,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
 
