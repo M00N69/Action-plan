@@ -140,7 +140,7 @@ def get_ai_recommendations(prompts, model):
             response = convo.send_message(prompt)
             corrective_actions = response.text
             recommendations.append(parse_recommendation(corrective_actions))
-            time.sleep(2)
+            time.sleep(5)
         except ResourceExhausted:
             st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
             break
