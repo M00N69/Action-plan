@@ -5,6 +5,9 @@ import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 import time
 
+# Utiliser le mode wide pour l'application
+st.set_page_config(layout="wide")
+
 def add_css_styles():
     st.markdown(
         """
@@ -16,7 +19,7 @@ def add_css_styles():
         }
         table {
             border-collapse: collapse;
-            width: 80%;
+            width: 100%;
             max-width: 1200px;
             border: 1px solid #ddd;
             background-color: #29292F; /* Fond sombre */
@@ -42,6 +45,7 @@ def add_css_styles():
         .dataframe-container {
             display: flex;
             justify-content: center;
+            width: 100%;
         }
         </style>
         """,
@@ -144,7 +148,7 @@ def dataframe_to_html(df):
 
 def generate_table(recommendations):
     recommendations_df = pd.DataFrame(recommendations)
-    st.markdown('<div class="table-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
+    st.markdown('<div class="dataframe-container">' + dataframe_to_html(recommendations_df) + '</div>', unsafe_allow_html=True)
     csv = recommendations_df.to_csv(index=False)
     st.download_button(
         label="Télécharger les Recommandations",
@@ -165,7 +169,7 @@ def main():
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
-            st.markdown('<div class="table-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
+            st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
             
             url = "https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/BRC9_GUIde%20_interpretation.txt"
             document_text = load_document_from_github(url)
