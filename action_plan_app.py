@@ -129,12 +129,8 @@ def parse_recommendation(text):
     return rec
 
 def display_recommendation(recommendation, index, requirement_number):
-    if recommendation is None:
-        st.error("Aucune recommandation disponible à afficher.")
-        return
-
     st.markdown(f'<div class="recommendation-container">', unsafe_allow_html=True)
-    st.markdown(f'<div class="recommendation-header">Non-conformité {index + 1} : Exigence {requirement_number}</div>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="recommendation-header">Recommandation pour la Non-conformité {index + 1} : Exigence {requirement_number}</h2>', unsafe_allow_html=True)
 
     for key, value in recommendation.items():
         if value:
@@ -160,8 +156,13 @@ def main():
 
             if 'current_index' not in st.session_state:
                 st.session_state.current_index = 0
-            if 'recommendations' not in st.session_state:
                 st.session_state.recommendations = []
+
+            # --- Afficher le numéro de la non-conformité actuelle et le total ---
+            st.markdown(f"**Non-conformité {st.session_state.current_index + 1} / {len(action_plan_df)}**")
+
+            # --- Afficher un indicateur de progression ---
+            progress_bar = st.progress(st.session_state.current_index / len(action_plan_df))
 
             current_non_conformity = action_plan_df.iloc[st.session_state.current_index]
             requirement_number = current_non_conformity["Numéro d'exigence"]
@@ -180,8 +181,14 @@ def main():
             if 'current_recommendation' in st.session_state:
                 display_recommendation(st.session_state.current_recommendation, st.session_state.current_index, requirement_number)
                 
+                # --- Afficher un bouton "Précédent" si applicable ---
+                if st.session_state.current_index > 0:
+                    if st.button("Précédent", key="previous_recommendation"):
+                        st.session_state.current_index -= 1
+                        st.session_state.current_recommendation = None
+
+                # --- Afficher un bouton "Nouvel essai" pour régénérer la recommandation ---
                 if st.button("Nouvel essai", key="retry_recommendation"):
-                    # Réinitialiser complètement l'état pour la nouvelle tentative
                     del st.session_state['current_recommendation']
                     prompt = prepare_prompt_for_non_conformity(current_non_conformity)
                     raw_recommendation = get_ai_recommendation_for_non_conformity(prompt, model)
@@ -192,7 +199,8 @@ def main():
                         st.session_state.current_recommendation = None
                     display_recommendation(recommendation, st.session_state.current_index, requirement_number)
                 
-                if st.button("Continuer", key="continue_to_next"):
+                # --- Afficher un bouton "Accepter et Continuer" ---
+                if st.button("Accepter et Continuer", key="continue_to_next"):
                     if st.session_state.current_recommendation and all(st.session_state.current_recommendation.values()):
                         st.session_state.recommendations.append({
                             "Numéro d'exigence": current_non_conformity["Numéro d'exigence"],
@@ -202,6 +210,7 @@ def main():
                         })
                         st.session_state.current_index += 1
                         del st.session_state['current_recommendation']
+                        progress_bar.progress(st.session_state.current_index / len(action_plan_df))
                         
                         if st.session_state.current_index >= len(action_plan_df):
                             st.markdown('<div class="success">Toutes les non-conformités ont été traitées. Vous pouvez maintenant télécharger toutes les recommandations.</div>', unsafe_allow_html=True)
@@ -214,14 +223,25 @@ def main():
                                 mime="text/csv",
                             )
                         else:
-                            st.session_state.current_recommendation = None  # Réinitialiser pour la non-conformité suivante
+                            st.session_state.current_recommendation = None
                             st.success("Recommandation acceptée. Passez à la non-conformité suivante.")
                     else:
                         st.warning("Certaines sections de la recommandation sont manquantes ou non générées. Veuillez essayer à nouveau.")
 
+            # --- Afficher un résumé des recommandations ---
+            st.subheader("Résumé des Recommandations")
+            if st.session_state.recommendations:
+                df_recommendations = pd.DataFrame(st.session_state.recommendations)
+                st.write(df_recommendations.to_html(classes='dataframe', index=False), unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger les recommandations",
+                    data=df_recommendations.to_csv(index=False),
+                    file_name="recommandations_ifs_food.csv",
+                    mime="text/csv",
+                )
+
 if __name__ == "__main__":
     main()
-
 
 
 
