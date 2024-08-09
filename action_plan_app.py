@@ -43,8 +43,8 @@ def prepare_prompt_for_non_conformity(non_conformity):
     prompt = f"""
 Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :
 
-- **Exigence** : {non_conformity["Numéro d'exigence"]}
-- **Non-conformité** : {non_conformity["Exigence IFS Food 8"]}
+- **Exigence** : {non_conformity['Numéro d\'exigence']}
+- **Non-conformité** : {non_conformity['Exigence IFS Food 8']}
 
 Fournissez une recommandation structurée comprenant :
 - **Correction immédiate**
@@ -96,7 +96,7 @@ def main():
                 st.session_state.recommendations = []
 
             current_non_conformity = action_plan_df.iloc[st.session_state.current_index]
-            st.subheader(f"Non-conformité {st.session_state.current_index + 1} : Exigence {current_non_conformity['Numéro d'exigence']}")
+            st.subheader(f"Non-conformité {st.session_state.current_index + 1} : Exigence {current_non_conformity['Numéro d\'exigence']}")
 
             if st.button("Obtenir Recommandation"):
                 prompt = prepare_prompt_for_non_conformity(current_non_conformity)
