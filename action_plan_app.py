@@ -40,17 +40,15 @@ def load_action_plan(uploaded_file):
         return None
 
 def prepare_prompt_for_non_conformity(non_conformity):
-    prompt = f"""
-Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :
-
-- **Exigence** : {non_conformity['Numéro d'exigence']}
-- **Non-conformité** : {non_conformity['Exigence IFS Food 8']}
-
-Fournissez une recommandation structurée comprenant :
-- **Correction immédiate**
-- **Preuves requises**
-- **Actions Correctives**
-"""
+    prompt = (
+        f"Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :\n\n"
+        f"- **Exigence** : {non_conformity['Numéro d'exigence']}\n"
+        f"- **Non-conformité** : {non_conformity['Exigence IFS Food 8']}\n\n"
+        "Fournissez une recommandation structurée comprenant :\n"
+        "- **Correction immédiate**\n"
+        "- **Preuves requises**\n"
+        "- **Actions Correctives**\n"
+    )
     return prompt
 
 def get_ai_recommendation_for_non_conformity(prompt, model):
@@ -96,9 +94,54 @@ def main():
                 st.session_state.recommendations = []
 
             current_non_conformity = action_plan_df.iloc[st.session_state.current_index]
-            st.subheader(f"Non-conformité {st.session_state.current_index + 1} : Exigence {current
+            st.subheader(f"Non-conformité {st.session_state.current_index + 1} : Exigence {current_non_conformity['Numéro d'exigence']}")
 
+            if st.button("Obtenir Recommandation"):
+                prompt = prepare_prompt_for_non_conformity(current_non_conformity)
+                raw_recommendation = get_ai_recommendation_for_non_conformity(prompt, model)
+                if raw_recommendation:
+                    recommendation = parse_recommendation(raw_recommendation)
+                    st.session_state.current_recommendation = recommendation
+                    st.write(recommendation)
 
+            if 'current_recommendation' in st.session_state:
+                st.write("### Recommandation:")
+                st.write(st.session_state.current_recommendation)
+                
+                if st.button("Nouvel essai"):
+                    prompt = prepare_prompt_for_non_conformity(current_non_conformity)
+                    raw_recommendation = get_ai_recommendation_for_non_conformity(prompt, model)
+                    if raw_recommendation:
+                        recommendation = parse_recommendation(raw_recommendation)
+                        st.session_state.current_recommendation = recommendation
+                        st.write(recommendation)
+                
+                if st.button("Continuer"):
+                    st.session_state.recommendations.append({
+                        "Numéro d'exigence": current_non_conformity["Numéro d'exigence"],
+                        "Correction proposée": st.session_state.current_recommendation["Correction proposée"],
+                        "Preuves potentielles": st.session_state.current_recommendation["Preuves potentielles"],
+                        "Actions correctives": st.session_state.current_recommendation["Actions correctives"]
+                    })
+                    st.session_state.current_index += 1
+                    del st.session_state['current_recommendation']
+                    
+                    if st.session_state.current_index >= len(action_plan_df):
+                        st.write("### Toutes les non-conformités ont été traitées.")
+                        st.write("Vous pouvez maintenant télécharger toutes les recommandations.")
+                        df_recommendations = pd.DataFrame(st.session_state.recommendations)
+                        st.write(df_recommendations)
+                        st.download_button(
+                            label="Télécharger les recommandations",
+                            data=df_recommendations.to_csv(index=False),
+                            file_name="recommandations_ifs_food.csv",
+                            mime="text/csv",
+                        )
+                    else:
+                        st.experimental_rerun()
+
+if __name__ == "__main__":
+    main()
 
 
 
