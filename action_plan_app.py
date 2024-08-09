@@ -196,7 +196,6 @@ def main():
                         del st.session_state['current_recommendation']
                         
                         if st.session_state.current_index >= len(action_plan_df):
-                            st.write("### Toutes les non-conformités ont été traitées.")
                             st.markdown('<div class="success">Toutes les non-conformités ont été traitées. Vous pouvez maintenant télécharger toutes les recommandations.</div>', unsafe_allow_html=True)
                             df_recommendations = pd.DataFrame(st.session_state.recommendations)
                             st.write(df_recommendations.to_html(classes='dataframe', index=False), unsafe_allow_html=True)
