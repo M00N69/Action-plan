@@ -1,10 +1,7 @@
 import streamlit as st
 import pandas as pd
-import requests
 import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted
 
-# Configuration de la page
 st.set_page_config(layout="wide")
 
 def add_css_styles():
@@ -42,6 +39,10 @@ def add_css_styles():
             margin-bottom: 10px;
             font-size: 16px;
             line-height: 1.5;
+        }
+        .warning {
+            color: red;
+            font-weight: bold;
         }
         </style>
         """,
@@ -88,10 +89,10 @@ Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un 
 - **Exigence** : {non_conformity['Numéro d\'exigence']}
 - **Non-conformité** : {non_conformity['Exigence IFS Food 8']}
 
-Fournissez une recommandation structurée comprenant :
-- **Correction immédiate**
-- **Preuves requises**
-- **Actions Correctives**
+Fournissez une recommandation structurée et détaillée comprenant :
+- **Correction immédiate** (action spécifique et claire)
+- **Preuves requises** (documents précis nécessaires)
+- **Actions Correctives** (mesures à long terme)
 """
     return prompt
 
@@ -100,9 +101,6 @@ def get_ai_recommendation_for_non_conformity(prompt, model):
         convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
         response = convo.send_message(prompt)
         return response.text
-    except ResourceExhausted as e:
-        st.error(f"Les ressources de l'API sont épuisées : {str(e)}")
-        return None
     except Exception as e:
         st.error(f"Une erreur inattendue s'est produite: {str(e)}")
         return None
@@ -129,7 +127,7 @@ def display_recommendation(recommendation, index, requirement_number):
         if value:
             st.markdown(f'<div class="recommendation-content"><b>{key} :</b> {value}</div>', unsafe_allow_html=True)
         else:
-            st.warning(f"Recommandation manquante pour {key}")
+            st.markdown(f'<div class="recommendation-content warning">Recommandation manquante pour {key}</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -176,28 +174,33 @@ def main():
                         display_recommendation(recommendation, st.session_state.current_index, requirement_number)
                 
                 if st.button("Continuer"):
-                    st.session_state.recommendations.append({
-                        "Numéro d'exigence": current_non_conformity["Numéro d'exigence"],
-                        "Correction proposée": st.session_state.current_recommendation["Correction proposée"],
-                        "Preuves potentielles": st.session_state.current_recommendation["Preuves potentielles"],
-                        "Actions correctives": st.session_state.current_recommendation["Actions correctives"]
-                    })
-                    st.session_state.current_index += 1
-                    del st.session_state['current_recommendation']
-                    
-                    if st.session_state.current_index >= len(action_plan_df):
-                        st.write("### Toutes les non-conformités ont été traitées.")
-                        st.write("Vous pouvez maintenant télécharger toutes les recommandations.")
-                        df_recommendations = pd.DataFrame(st.session_state.recommendations)
-                        st.write(df_recommendations.to_html(classes='dataframe', index=False), unsafe_allow_html=True)
-                        st.download_button(
-                            label="Télécharger les recommandations",
-                            data=df_recommendations.to_csv(index=False),
-                            file_name="recommandations_ifs_food.csv",
-                            mime="text/csv",
-                        )
+                    if all(st.session_state.current_recommendation.values()):
+                        st.session_state.recommendations.append({
+                            "Numéro d'exigence": current_non_conformity["Numéro d'exigence"],
+                            "Correction proposée": st.session_state.current_recommendation["Correction proposée"],
+                            "Preuves potentielles": st.session_state.current_recommendation["Preuves potentielles"],
+                            "Actions correctives": st.session_state.current_recommendation["Actions correctives"]
+                        })
+                        st.session_state.current_index += 1
+                        del st.session_state['current_recommendation']
+                        
+                        if st.session_state.current_index >= len(action_plan_df):
+                            st.write("### Toutes les non-conformités ont été traitées.")
+                            st.write("Vous pouvez maintenant télécharger toutes les recommandations.")
+                            df_recommendations = pd.DataFrame(st.session_state.recommendations)
+                            st.write(df_recommendations.to_html(classes='dataframe', index=False), unsafe_allow_html=True)
+                            st.download_button(
+                                label="Télécharger les recommandations",
+                                data=df_recommendations.to_csv(index=False),
+                                file_name="recommandations_ifs_food.csv",
+                                mime="text/csv",
+                            )
+                        else:
+                            # Simulate rerun by clearing the recommendation and advancing the index
+                            st.session_state.current_recommendation = None
+                            st.experimental_set_query_params(index=st.session_state.current_index)
                     else:
-                        st.experimental_rerun()
+                        st.warning("Certaines sections de la recommandation sont manquantes. Veuillez essayer à nouveau.")
 
 if __name__ == "__main__":
     main()
