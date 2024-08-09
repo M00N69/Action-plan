@@ -141,7 +141,6 @@ def main():
     st.markdown('<div class="main-header">Assistant VisiPilot pour Plan d\'Actions IFS</div>', unsafe_allow_html=True)
     st.write("Téléchargez votre plan d'action et obtenez des recommandations pour les corrections et les actions correctives.")
     
-    # Utilisation d'une clé unique pour le file_uploader
     uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"], key="file_uploader")
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
@@ -158,13 +157,13 @@ def main():
             requirement_number = current_non_conformity["Numéro d'exigence"]
             st.subheader(f"Non-conformité {st.session_state.current_index + 1} : Exigence {requirement_number}")
 
-            if st.button("Obtenir Recommandation", key="get_recommendation"):
-                prompt = prepare_prompt_for_non_conformity(current_non_conformity)
-                raw_recommendation = get_ai_recommendation_for_non_conformity(prompt, model)
-                if raw_recommendation:
-                    recommendation = parse_recommendation(raw_recommendation)
-                    st.session_state.current_recommendation = recommendation
-                    display_recommendation(recommendation, st.session_state.current_index, requirement_number)
+            if 'current_recommendation' not in st.session_state:
+                if st.button("Obtenir Recommandation", key="get_recommendation"):
+                    prompt = prepare_prompt_for_non_conformity(current_non_conformity)
+                    raw_recommendation = get_ai_recommendation_for_non_conformity(prompt, model)
+                    if raw_recommendation:
+                        recommendation = parse_recommendation(raw_recommendation)
+                        st.session_state.current_recommendation = recommendation
 
             if 'current_recommendation' in st.session_state:
                 display_recommendation(st.session_state.current_recommendation, st.session_state.current_index, requirement_number)
