@@ -92,29 +92,34 @@ def load_action_plan(uploaded_file):
 
 def prepare_prompt(action_plan_df):
     prompt = """
-Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. 
-Vous devez fournir des recommandations pour un plan d'action IFS Food 8 contenant des non-conformités détectées. Pour chaque non-conformité, veuillez fournir les informations suivantes :
+Je suis un expert en IFS Food 8, spécialisé dans l'analyse des non-conformités détectées lors des audits. 
+Vous devez fournir des recommandations détaillées pour chaque déviation identifiée dans le plan d'action suivant, en respectant les définitions et les standards IFS. Chaque recommandation doit inclure :
 
-1. **Correction** : Action immédiate visant à remettre en conformité la situation non conforme observée. Cette correction ne doit pas inclure la recherche de causes, mais doit se concentrer sur la résolution directe de la non-conformité. Les corrections doivent être claires et précises.
-2. **Preuves potentielles** : Types de documents ou enregistrements qui peuvent être utilisés pour démontrer que la correction a été mise en œuvre avec succès. Exemples de preuves acceptables : photos avant/après, factures des matériaux utilisés, enregistrements de formation, rapports d'intervention, etc.
-3. **Actions Correctives** : Mesures destinées à éliminer la cause sous-jacente de la non-conformité et à prévenir sa réapparition. Les actions correctives doivent inclure des méthodes telles que l'analyse des causes profondes (ex. : méthode des 5 Pourquoi, diagramme d'Ishikawa) et des propositions concrètes pour éviter que la déviation ne se reproduise.
+1. **Correction immédiate** : Une action visant à éliminer la non-conformité détectée. La correction doit se concentrer uniquement sur la résolution du problème observé, sans inclure la recherche des causes. 
+   Exemple : Si un équipement n'est pas en bon état de propreté, la correction pourrait être de le nettoyer immédiatement.
 
-Les recommandations doivent être pertinentes, exhaustives et conformes aux standards IFS, en visant l'élimination complète des déviations observées. Voici les non-conformités détectées, associées aux exigences spécifiques d'IFS Food 8 :
+2. **Preuves requises** : Une liste de preuves nécessaires pour démontrer que la correction a été effectuée avec succès. 
+   Exemple : Photos avant/après, factures des matériaux utilisés, enregistrements de formation, rapports d'intervention.
+
+3. **Actions Correctives** : Une action visant à éliminer la cause sous-jacente de la non-conformité afin de prévenir sa réapparition. Les actions correctives doivent inclure l'identification des causes profondes, telles que la méthode des 5 Pourquoi ou le diagramme d'Ishikawa.
+   Exemple : Si un équipement n'est pas intégré dans le plan de nettoyage, l'action corrective pourrait être d'intégrer cet équipement dans le plan de nettoyage et de former le personnel.
+
+Veuillez vous assurer que chaque recommandation est exhaustive et permet d’éliminer la déviation ainsi que d'éviter sa réapparition.
+
+Voici les non-conformités détectées dans le plan d'action :
+
 """
-
     for _, row in action_plan_df.iterrows():
         requirement_number = row["Numéro d'exigence"]
-        prompt += f"### Non-conformité liée à l'exigence {requirement_number}\n"
+        description = row.get("Explication (par l’auditeur/l’évaluateur)", "Description non spécifiée")
+        prompt += f"\n- Exigence {requirement_number}: {description}"
 
     prompt += """
-Les réponses doivent être formulées comme suit :
-
-- **Correction** : [Détail de la correction immédiate]
-- **Preuves potentielles** : [Liste des preuves acceptables, par exemple, photos avant/après, factures, rapports d'intervention, etc.]
-- **Actions Correctives** : [Mesures pour éviter la réapparition, par exemple, mise à jour des procédures, formation du personnel, etc.]
-
-Référez-vous au Guide IFS Food 8 pour des preuves et des recommandations appropriées.
-    """
+Répondez pour chaque exigence avec le format suivant :
+- **Correction immédiate** : [Détail de la correction]
+- **Preuves requises** : [Liste des preuves nécessaires]
+- **Actions Correctives** : [Détail des actions correctives]
+"""
 
     return prompt
 
@@ -127,15 +132,12 @@ def get_ai_recommendations(prompt, model, action_plan_df):
         recommendations = parse_recommendations(recommendations_text)
         
         # S'assurer que nous avons une recommandation pour chaque non-conformité
-        while len(recommendations) < len(action_plan_df):
-            missing_recs = len(action_plan_df) - len(recommendations)
-            additional_prompt = f"Veuillez fournir des recommandations pour les {missing_recs} non-conformités restantes."
-            additional_response = convo.send_message(additional_prompt)
-            additional_recs = parse_recommendations(additional_response.text)
-            recommendations.extend(additional_recs)
+        if len(recommendations) < len(action_plan_df):
+            st.warning("Certaines non-conformités n'ont pas reçu de recommandations complètes.")
         
-        # Tronquer si nous avons trop de recommandations
-        recommendations = recommendations[:len(action_plan_df)]
+        return recommendations[:len(action_plan_df)]  # Tronquer si trop de recommandations
+    except ResourceExhausted as e:
+        st.error(f"Les ressources de l'API sont épuisées : {str(e)}")
     except Exception as e:
         st.error(f"Une erreur inattendue s'est produite: {str(e)}")
     
@@ -144,27 +146,18 @@ def get_ai_recommendations(prompt, model, action_plan_df):
 def parse_recommendations(text):
     recommendations = []
     sections = text.split("Non-conformité")
-    for section in sections[1:]:  # Ignorer la première section qui est généralement vide
+    for section in sections[1:]:
         rec = {
             "Correction proposée": "",
             "Preuves potentielles": "",
             "Actions correctives": ""
         }
-        lines = section.split("\n")
-        current_key = None
-        for line in lines:
-            line = line.strip()
-            if line.startswith("Correction :"):
-                current_key = "Correction proposée"
-                rec[current_key] = line.replace("Correction :", "").strip()
-            elif line.startswith("Preuves potentielles :"):
-                current_key = "Preuves potentielles"
-                rec[current_key] = line.replace("Preuves potentielles :", "").strip()
-            elif line.startswith("Actions Correctives :"):
-                current_key = "Actions correctives"
-                rec[current_key] = line.replace("Actions Correctives :", "").strip()
-            elif current_key and line:
-                rec[current_key] += " " + line.strip()
+        if "Correction :" in section:
+            rec["Correction proposée"] = section.split("Correction :")[1].split("Preuves potentielles :")[0].strip()
+        if "Preuves potentielles :" in section:
+            rec["Preuves potentielles"] = section.split("Preuves potentielles :")[1].split("Actions Correctives :")[0].strip()
+        if "Actions Correctives :" in section:
+            rec["Actions correctives"] = section.split("Actions Correctives :")[1].strip()
         recommendations.append(rec)
     return recommendations
 
