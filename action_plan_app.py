@@ -111,57 +111,51 @@ def prepare_prompt(action_plan_df):
     prompt += "Référez-vous au Guide IFS Food 8 pour des preuves et des recommandations appropriées."
     return prompt
 
-def get_ai_recommendations(prompt, model):
+def get_ai_recommendations(prompt, model, action_plan_df):
     recommendations = []
     try:
         convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
         response = convo.send_message(prompt)
         recommendations_text = response.text
-        st.write(f"Recommendations Text: {recommendations_text}")  # Debugging line
         recommendations = parse_recommendations(recommendations_text)
-    except ResourceExhausted:
-        st.error("Ressources épuisées pour l'API GenAI. Veuillez réessayer plus tard.")
+        
+        # S'assurer que nous avons une recommandation pour chaque non-conformité
+        while len(recommendations) < len(action_plan_df):
+            missing_recs = len(action_plan_df) - len(recommendations)
+            additional_prompt = f"Veuillez fournir des recommandations pour les {missing_recs} non-conformités restantes."
+            additional_response = convo.send_message(additional_prompt)
+            additional_recs = parse_recommendations(additional_response.text)
+            recommendations.extend(additional_recs)
+        
+        # Tronquer si nous avons trop de recommandations
+        recommendations = recommendations[:len(action_plan_df)]
     except Exception as e:
         st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-        recommendations.append({
-            "Correction proposée": "Erreur lors de la génération de la recommandation",
-            "Preuves potentielles": "",
-            "Actions correctives": ""
-        })
+    
     return recommendations
 
 def parse_recommendations(text):
     recommendations = []
     sections = text.split("Non-conformité")
-    for section in sections:
-        if section.strip():
-            correction = ""
-            preuves = ""
-            actions = ""
-            correction_found = False
-            preuves_found = False
-            actions_found = False
-            for line in section.split("\n"):
-                line = line.strip()
-                if line.startswith("Correction proposée:"):
-                    correction = line.replace("Correction proposée:", "").strip()
-                    correction_found = True
-                elif line.startswith("Preuves potentielles:"):
-                    preuves = line.replace("Preuves potentielles:", "").strip()
-                    preuves_found = True
-                elif line.startswith("Actions correctives:"):
-                    actions = line.replace("Actions correctives:", "").strip()
-                    actions_found = True
-            
-            if correction_found and preuves_found and actions_found:
-                recommendations.append({
-                    "Correction proposée": correction,
-                    "Preuves potentielles": preuves,
-                    "Actions correctives": actions
-                })
-            else:
-                st.warning(f"Recommandation incomplète détectée : {section}")
-    
+    for section in sections[1:]:  # Ignorer la première section qui est généralement vide
+        rec = {
+            "Correction proposée": "",
+            "Preuves potentielles": "",
+            "Actions correctives": ""
+        }
+        lines = section.split("\n")
+        current_key = None
+        for line in lines:
+            line = line.strip()
+            if line.startswith("Correction proposée:"):
+                current_key = "Correction proposée"
+            elif line.startswith("Preuves potentielles:"):
+                current_key = "Preuves potentielles"
+            elif line.startswith("Actions correctives:"):
+                current_key = "Actions correctives"
+            elif current_key and line:
+                rec[current_key] += line + " "
+        recommendations.append(rec)
     return recommendations
 
 def dataframe_to_html(df):
@@ -175,28 +169,15 @@ def display_recommendations(recommendations, action_plan_df):
         
         if index < len(recommendations):
             rec = recommendations[index]
-            st.markdown(f'<div class="recommendation-section"><b>Correction proposée :</b> {rec["Correction proposée"]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="recommendation-section"><b>Preuves potentielles :</b> {rec["Preuves potentielles"]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="recommendation-section"><b>Actions correctives :</b> {rec["Actions correctives"]}</div>', unsafe_allow_html=True)
+            for key, value in rec.items():
+                if value:
+                    st.markdown(f'<div class="recommendation-section"><b>{key} :</b> {value}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="recommendation-section"><b>{key} :</b> Recommandation manquante</div>', unsafe_allow_html=True)
         else:
-            st.warning("Recommandation manquante pour cette non-conformité.")
+            st.markdown("<div class='recommendation-section'><b>Recommandation manquante pour cette non-conformité.</b></div>", unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
-
-def generate_downloadable_text(recommendations, action_plan_df):
-    output = "Plan d'action IFS Food 8 : Corrections et Actions Correctives\n\n"
-    for index, (i, row) in enumerate(action_plan_df.iterrows()):
-        output += f"Non-conformité {index + 1} : {row['Exigence IFS Food 8']}\n"
-        output += f"Description de la non-conformité : {row['Explication (par l’auditeur/l’évaluateur)']}\n"
-        if index < len(recommendations):
-            rec = recommendations[index]
-            output += f"Correction proposée : {rec['Correction proposée']}\n"
-            output += f"Preuves potentielles : {rec['Preuves potentielles']}\n"
-            output += f"Actions correctives : {rec['Actions correctives']}\n"
-        else:
-            output += "Recommandation manquante pour cette non-conformité.\n"
-        output += "\n"
-    return output
 
 def main():
     add_css_styles()
@@ -217,18 +198,9 @@ def main():
             if document_text:
                 model = configure_model(document_text)
                 prompt = prepare_prompt(action_plan_df)
-                recommendations = get_ai_recommendations(prompt, model)
+                recommendations = get_ai_recommendations(prompt, model, action_plan_df)
                 st.subheader("Recommandations de l'IA")
                 display_recommendations(recommendations, action_plan_df)
-                
-                if st.button("Télécharger les Recommandations"):
-                    text_output = generate_downloadable_text(recommendations, action_plan_df)
-                    st.download_button(
-                        label="Télécharger le fichier",
-                        data=text_output,
-                        file_name="recommandations_ifs.txt",
-                        mime="text/plain"
-                    )
 
 if __name__ == "__main__":
     main()
