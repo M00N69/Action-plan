@@ -50,7 +50,7 @@ Fournissez une recommandation structurée comprenant :
 - **Correction immédiate**
 - **Preuves requises**
 - **Actions Correctives**
-    """
+"""
     return prompt
 
 def get_ai_recommendation_for_non_conformity(prompt, model):
