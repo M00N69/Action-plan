@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
-import time
 
 # Utiliser le mode wide pour l'application
 st.set_page_config(layout="wide")
@@ -37,7 +36,7 @@ def configure_model(document_text):
         "temperature": 0.7,
         "top_p": 0.9,
         "top_k": 50,
-        "max_output_tokens": 2048,  # Augmenté pour permettre des réponses plus longues
+        "max_output_tokens": 2048,
     }
     safety_settings = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -64,35 +63,26 @@ def load_document_from_github(url):
         return None
 
 def load_action_plan(uploaded_file):
-    if uploaded_file is not None:
-        try:
-            # Load the file without specifying header to inspect column names
-            temp_df = pd.read_excel(uploaded_file, header=None)
-
-            # Identify the correct header row (adjust the index based on actual header location)
-            header_row_index = 12  # Adjust this index based on your file structure
-            action_plan_df = pd.read_excel(uploaded_file, header=header_row_index)
-
-            # Attempt to rename columns to match expected format
-            action_plan_df.columns = [col.strip() for col in action_plan_df.columns]
-            action_plan_df = action_plan_df.rename(columns={
-                "Numéro d'exigence": "Numéro d'exigence",
-                "Exigence IFS Food 8": "Exigence IFS Food 8",
-                "Notation": "Notation",
-                "Explication (par l'auditeur/l'évaluateur)": "Explication (par l'auditeur/l'évaluateur)"
-            })
-
-            # Selecting expected columns
-            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l'auditeur/l'évaluateur)"]
-            action_plan_df = action_plan_df[expected_columns]
-
-            # Filter out rows where "Notation" is not 'B', 'C', or 'D'
-            action_plan_df = action_plan_df[action_plan_df['Notation'].isin(['B', 'C', 'D'])]
-
-            return action_plan_df
-        except Exception as e:
-            st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
-    return None
+    try:
+        # Charger le fichier Excel en spécifiant la ligne d'en-tête
+        action_plan_df = pd.read_excel(uploaded_file, header=12)
+        
+        # Renommer les colonnes pour s'assurer qu'elles correspondent à nos attentes
+        action_plan_df = action_plan_df.rename(columns={
+            "Numéro d'exigence": "Numéro d'exigence",
+            "Exigence IFS Food 8": "Exigence IFS Food 8",
+            "Notation": "Notation",
+            "Explication (par l'auditeur/l'évaluateur)": "Explication (par l'auditeur/l'évaluateur)"
+        })
+        
+        # Sélectionner uniquement les colonnes dont nous avons besoin
+        columns_to_keep = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l'auditeur/l'évaluateur)"]
+        action_plan_df = action_plan_df[columns_to_keep]
+        
+        return action_plan_df
+    except Exception as e:
+        st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
+        return None
 
 def prepare_prompt(action_plan_df):
     prompt = """
@@ -107,14 +97,10 @@ Les recommandations doivent être pertinentes, exhaustives et conformes aux stan
 """
 
     for _, row in action_plan_df.iterrows():
-        requirement_number = row["Numéro d'exigence"]
-        exigence = row["Exigence IFS Food 8"]
-        notation = row["Notation"]
-        explication = row["Explication (par l'auditeur/l'évaluateur)"]
-        prompt += f"\n### Non-conformité liée à l'exigence {requirement_number}\n"
-        prompt += f"Exigence: {exigence}\n"
-        prompt += f"Notation: {notation}\n"
-        prompt += f"Explication: {explication}\n"
+        prompt += f"\n### Non-conformité liée à l'exigence {row['Numéro d'exigence']}\n"
+        prompt += f"Exigence: {row['Exigence IFS Food 8']}\n"
+        prompt += f"Notation: {row['Notation']}\n"
+        prompt += f"Explication: {row['Explication (par l'auditeur/l'évaluateur)']}\n"
 
     prompt += """
 Les réponses doivent être formulées comme suit pour chaque non-conformité :
@@ -231,7 +217,7 @@ def main():
                 else:
                     st.error("Aucune recommandation n'a pu être générée. Veuillez réessayer.")
         else:
-            st.error("Aucune non-conformité (notation B, C ou D) n'a été trouvée dans le fichier uploadé.")
+            st.error("Aucune donnée n'a été trouvée dans le fichier uploadé ou le fichier est vide.")
 
 if __name__ == "__main__":
     main()
