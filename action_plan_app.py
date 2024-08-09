@@ -37,7 +37,7 @@ def configure_model(document_text):
         "temperature": 0.7,
         "top_p": 0.9,
         "top_k": 50,
-        "max_output_tokens": 1024,
+        "max_output_tokens": 2048,  # Augmenté pour permettre des réponses plus longues
     }
     safety_settings = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -79,12 +79,15 @@ def load_action_plan(uploaded_file):
                 "Numéro d'exigence": "Numéro d'exigence",
                 "Exigence IFS Food 8": "Exigence IFS Food 8",
                 "Notation": "Notation",
-                "Explication (par l’auditeur/l’évaluateur)": "Explication (par l’auditeur/l’évaluateur)"
+                "Explication (par l'auditeur/l'évaluateur)": "Explication (par l'auditeur/l'évaluateur)"
             })
 
             # Selecting expected columns
-            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
+            expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l'auditeur/l'évaluateur)"]
             action_plan_df = action_plan_df[expected_columns]
+
+            # Filter out rows where "Notation" is not 'B', 'C', or 'D'
+            action_plan_df = action_plan_df[action_plan_df['Notation'].isin(['B', 'C', 'D'])]
 
             return action_plan_df
         except Exception as e:
@@ -105,15 +108,23 @@ Les recommandations doivent être pertinentes, exhaustives et conformes aux stan
 
     for _, row in action_plan_df.iterrows():
         requirement_number = row["Numéro d'exigence"]
-        prompt += f"### Non-conformité liée à l'exigence {requirement_number}\n"
+        exigence = row["Exigence IFS Food 8"]
+        notation = row["Notation"]
+        explication = row["Explication (par l'auditeur/l'évaluateur)"]
+        prompt += f"\n### Non-conformité liée à l'exigence {requirement_number}\n"
+        prompt += f"Exigence: {exigence}\n"
+        prompt += f"Notation: {notation}\n"
+        prompt += f"Explication: {explication}\n"
 
     prompt += """
-Les réponses doivent être formulées comme suit :
+Les réponses doivent être formulées comme suit pour chaque non-conformité :
 
+Non-conformité [Numéro d'exigence] :
 - **Correction** : [Détail de la correction immédiate]
 - **Preuves potentielles** : [Liste des preuves acceptables, par exemple, photos avant/après, factures, rapports d'intervention, etc.]
 - **Actions Correctives** : [Mesures pour éviter la réapparition, par exemple, mise à jour des procédures, formation du personnel, etc.]
 
+Assurez-vous de fournir des recommandations pour toutes les non-conformités listées.
 Référez-vous au Guide IFS Food 8 pour des preuves et des recommandations appropriées.
     """
 
@@ -122,7 +133,7 @@ Référez-vous au Guide IFS Food 8 pour des preuves et des recommandations appro
 def get_ai_recommendations(prompt, model, action_plan_df):
     recommendations = []
     try:
-        convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
+        convo = model.start_chat(history=[])
         response = convo.send_message(prompt)
         recommendations_text = response.text
         recommendations = parse_recommendations(recommendations_text)
@@ -137,6 +148,8 @@ def get_ai_recommendations(prompt, model, action_plan_df):
         
         # Tronquer si nous avons trop de recommandations
         recommendations = recommendations[:len(action_plan_df)]
+    except ResourceExhausted:
+        st.error("Limite de l'API atteinte. Veuillez réessayer dans quelques instants.")
     except Exception as e:
         st.error(f"Une erreur inattendue s'est produite: {str(e)}")
     
@@ -147,7 +160,7 @@ def parse_recommendations(text):
     sections = text.split("Non-conformité")
     for section in sections[1:]:  # Ignorer la première section qui est généralement vide
         rec = {
-            "Correction proposée": "",
+            "Correction": "",
             "Preuves potentielles": "",
             "Actions correctives": ""
         }
@@ -155,11 +168,11 @@ def parse_recommendations(text):
         current_key = None
         for line in lines:
             line = line.strip()
-            if line.startswith("Correction proposée:"):
-                current_key = "Correction proposée"
-            elif line.startswith("Preuves potentielles:"):
+            if line.startswith("Correction :") or line.startswith("Correction:"):
+                current_key = "Correction"
+            elif line.startswith("Preuves potentielles :") or line.startswith("Preuves potentielles:"):
                 current_key = "Preuves potentielles"
-            elif line.startswith("Actions correctives:"):
+            elif line.startswith("Actions correctives :") or line.startswith("Actions correctives:"):
                 current_key = "Actions correctives"
             elif current_key and line:
                 rec[current_key] += line + " "
@@ -170,9 +183,12 @@ def dataframe_to_html(df):
     return df.to_html(classes='dataframe table-container', escape=False, index=False)
 
 def display_recommendations(recommendations, action_plan_df):
-    for index, (i, row) in enumerate(action_plan_df.iterrows()):
+    for index, (_, row) in enumerate(action_plan_df.iterrows()):
         st.markdown('<div class="recommendation-container">', unsafe_allow_html=True)
         st.markdown(f'<div class="recommendation-title">Non-conformité {index + 1} : Exigence {row["Numéro d'exigence"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div><b>Exigence :</b> {row["Exigence IFS Food 8"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div><b>Notation :</b> {row["Notation"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div><b>Explication :</b> {row["Explication (par l'auditeur/l'évaluateur)"]}</div>', unsafe_allow_html=True)
         
         if index < len(recommendations):
             rec = recommendations[index]
@@ -197,7 +213,7 @@ def main():
     uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
-        if action_plan_df is not None:
+        if action_plan_df is not None and not action_plan_df.empty:
             st.markdown('<div class="dataframe-container">' + dataframe_to_html(action_plan_df) + '</div>', unsafe_allow_html=True)
             
             url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
@@ -205,13 +221,20 @@ def main():
             if document_text:
                 model = configure_model(document_text)
                 prompt = prepare_prompt(action_plan_df)
-                recommendations = get_ai_recommendations(prompt, model, action_plan_df)
-                st.subheader("Recommandations de l'IA")
-                display_recommendations(recommendations, action_plan_df)
+                
+                with st.spinner('Génération des recommandations en cours...'):
+                    recommendations = get_ai_recommendations(prompt, model, action_plan_df)
+                
+                if recommendations:
+                    st.subheader("Recommandations de l'IA")
+                    display_recommendations(recommendations, action_plan_df)
+                else:
+                    st.error("Aucune recommandation n'a pu être générée. Veuillez réessayer.")
+        else:
+            st.error("Aucune non-conformité (notation B, C ou D) n'a été trouvée dans le fichier uploadé.")
 
 if __name__ == "__main__":
     main()
-
 
 
 
