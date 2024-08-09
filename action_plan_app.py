@@ -101,17 +101,11 @@ Vous devez fournir des recommandations pour un plan d'action IFS Food 8 contenan
 3. **Actions Correctives** : Mesures destinées à éliminer la cause sous-jacente de la non-conformité et à prévenir sa réapparition. Les actions correctives doivent inclure des méthodes telles que l'analyse des causes profondes (ex. : méthode des 5 Pourquoi, diagramme d'Ishikawa) et des propositions concrètes pour éviter que la déviation ne se reproduise.
 
 Les recommandations doivent être pertinentes, exhaustives et conformes aux standards IFS, en visant l'élimination complète des déviations observées. Voici les non-conformités détectées, associées aux exigences spécifiques d'IFS Food 8 :
-
-    """
+"""
 
     for _, row in action_plan_df.iterrows():
-        requirement_text = row["Exigence IFS Food 8"]
-        non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
         requirement_number = row["Numéro d'exigence"]
-        
-        prompt += f"### Non-conformité liée à l'exigence {requirement_number} :\n"
-        prompt += f"**Exigence IFS Food 8**: {requirement_text}\n"
-        prompt += f"**Description de la non-conformité**: {non_conformity_text}\n\n"
+        prompt += f"### Non-conformité liée à l'exigence {requirement_number}\n"
 
     prompt += """
 Les réponses doivent être formulées comme suit :
@@ -178,8 +172,7 @@ def dataframe_to_html(df):
 def display_recommendations(recommendations, action_plan_df):
     for index, (i, row) in enumerate(action_plan_df.iterrows()):
         st.markdown('<div class="recommendation-container">', unsafe_allow_html=True)
-        st.markdown(f'<div class="recommendation-title">Non-conformité {index + 1} : {row["Exigence IFS Food 8"]}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="recommendation-section"><b>Description de la non-conformité :</b> {row["Explication (par l’auditeur/l’évaluateur)"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="recommendation-title">Non-conformité {index + 1} : Exigence {row["Numéro d'exigence"]}</div>', unsafe_allow_html=True)
         
         if index < len(recommendations):
             rec = recommendations[index]
