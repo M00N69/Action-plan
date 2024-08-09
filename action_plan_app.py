@@ -92,23 +92,37 @@ def load_action_plan(uploaded_file):
     return None
 
 def prepare_prompt(action_plan_df):
-    prompt = "Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. J'ai un plan d'action IFS Food 8 contenant des non-conformités détectées. Pour chaque non-conformité, veuillez fournir les informations suivantes :\n\n"
-    prompt += "1. La correction proposée pour résoudre la non-conformité.\n"
-    prompt += "2. Les preuves potentielles pour soutenir la correction proposée.\n"
-    prompt += "3. Les actions correctives permettant d'éliminer les causes sous-jacentes de la non-conformité.\n\n"
-    prompt += "Voici les non-conformités détectées :\n\n"
-    
+    prompt = """
+Je suis un expert en IFS Food 8, avec une connaissance approfondie des exigences et des industries alimentaires. 
+Vous devez fournir des recommandations pour un plan d'action IFS Food 8 contenant des non-conformités détectées. Pour chaque non-conformité, veuillez fournir les informations suivantes :
+
+1. **Correction** : Action immédiate visant à remettre en conformité la situation non conforme observée. Cette correction ne doit pas inclure la recherche de causes, mais doit se concentrer sur la résolution directe de la non-conformité. Les corrections doivent être claires et précises.
+2. **Preuves potentielles** : Types de documents ou enregistrements qui peuvent être utilisés pour démontrer que la correction a été mise en œuvre avec succès. Exemples de preuves acceptables : photos avant/après, factures des matériaux utilisés, enregistrements de formation, rapports d'intervention, etc.
+3. **Actions Correctives** : Mesures destinées à éliminer la cause sous-jacente de la non-conformité et à prévenir sa réapparition. Les actions correctives doivent inclure des méthodes telles que l'analyse des causes profondes (ex. : méthode des 5 Pourquoi, diagramme d'Ishikawa) et des propositions concrètes pour éviter que la déviation ne se reproduise.
+
+Les recommandations doivent être pertinentes, exhaustives et conformes aux standards IFS, en visant l'élimination complète des déviations observées. Voici les non-conformités détectées, associées aux exigences spécifiques d'IFS Food 8 :
+
+    """
+
     for _, row in action_plan_df.iterrows():
         requirement_text = row["Exigence IFS Food 8"]
         non_conformity_text = row["Explication (par l’auditeur/l’évaluateur)"]
+        requirement_number = row["Numéro d'exigence"]
+        
+        prompt += f"### Non-conformité liée à l'exigence {requirement_number} :\n"
         prompt += f"**Exigence IFS Food 8**: {requirement_text}\n"
         prompt += f"**Description de la non-conformité**: {non_conformity_text}\n\n"
-    
-    prompt += "Répondez en utilisant le format suivant pour chaque non-conformité :\n\n"
-    prompt += "**Correction proposée**: {correction_proposée}\n\n"
-    prompt += "**Preuves potentielles**: {preuves_potentielles}\n\n"
-    prompt += "**Actions correctives**: {actions_correctives}\n\n"
-    prompt += "Référez-vous au Guide IFS Food 8 pour des preuves et des recommandations appropriées."
+
+    prompt += """
+Les réponses doivent être formulées comme suit :
+
+- **Correction** : [Détail de la correction immédiate]
+- **Preuves potentielles** : [Liste des preuves acceptables, par exemple, photos avant/après, factures, rapports d'intervention, etc.]
+- **Actions Correctives** : [Mesures pour éviter la réapparition, par exemple, mise à jour des procédures, formation du personnel, etc.]
+
+Référez-vous au Guide IFS Food 8 pour des preuves et des recommandations appropriées.
+    """
+
     return prompt
 
 def get_ai_recommendations(prompt, model, action_plan_df):
@@ -173,9 +187,9 @@ def display_recommendations(recommendations, action_plan_df):
                 if value:
                     st.markdown(f'<div class="recommendation-section"><b>{key} :</b> {value}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f'<div class="recommendation-section"><b>{key} :</b> Recommandation manquante</div>', unsafe_allow_html=True)
+                    st.warning(f"Recommandation manquante pour {key}")
         else:
-            st.markdown("<div class='recommendation-section'><b>Recommandation manquante pour cette non-conformité.</b></div>", unsafe_allow_html=True)
+            st.warning("Recommandation manquante pour cette non-conformité.")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
