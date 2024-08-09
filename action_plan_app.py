@@ -40,15 +40,17 @@ def load_action_plan(uploaded_file):
         return None
 
 def prepare_prompt_for_non_conformity(non_conformity):
-    prompt = (
-        f"Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :\n\n"
-        f"- **Exigence** : {non_conformity['Numéro d'exigence']}\n"
-        f"- **Non-conformité** : {non_conformity['Exigence IFS Food 8']}\n\n"
-        "Fournissez une recommandation structurée comprenant :\n"
-        "- **Correction immédiate**\n"
-        "- **Preuves requises**\n"
-        "- **Actions Correctives**\n"
-    )
+    prompt = f"""
+Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :
+
+- **Exigence** : {non_conformity["Numéro d'exigence"]}
+- **Non-conformité** : {non_conformity["Exigence IFS Food 8"]}
+
+Fournissez une recommandation structurée comprenant :
+- **Correction immédiate**
+- **Preuves requises**
+- **Actions Correctives**
+"""
     return prompt
 
 def get_ai_recommendation_for_non_conformity(prompt, model):
