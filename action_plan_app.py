@@ -27,7 +27,7 @@ def add_css_styles():
             margin-bottom: 30px;
             border: 1px solid #004080;
             border-radius: 5px;
-            background-color: #f9f9f9;
+            background-color: #f0f8ff;
         }
         .recommendation-header {
             font-weight: bold;
@@ -42,6 +42,10 @@ def add_css_styles():
         }
         .warning {
             color: red;
+            font-weight: bold;
+        }
+        .success {
+            color: green;
             font-weight: bold;
         }
         </style>
@@ -118,8 +122,10 @@ def parse_recommendation(text):
             rec["Preuves potentielles"] = text.split("Preuves requises")[1].split("Actions Correctives")[0].strip()
         if "Actions Correctives" in text:
             rec["Actions correctives"] = text.split("Actions Correctives")[1].split("Remarques")[0].strip()
+        else:
+            rec["Actions correctives"] = "Aucune action corrective spécifique n'a été proposée dans cette recommandation."
     except IndexError:
-        st.error("La recommandation fournie par l'IA est mal structurée. Veuillez réessayer ou vérifier le prompt.")
+        st.error("La recommandation fournie par l'IA est mal structurée ou incomplète. Veuillez essayer à nouveau.")
     return rec
 
 def display_recommendation(recommendation, index, requirement_number):
@@ -136,11 +142,11 @@ def display_recommendation(recommendation, index, requirement_number):
 
 def main():
     add_css_styles()
-    
+
     st.markdown('<div class="banner"><img src="https://raw.githubusercontent.com/M00N69/Gemini-Knowledge/main/visipilot%20banner.PNG" alt="Banner" width="80%"></div>', unsafe_allow_html=True)
     st.markdown('<div class="main-header">Assistant VisiPilot pour Plan d\'Actions IFS</div>', unsafe_allow_html=True)
     st.write("Téléchargez votre plan d'action et obtenez des recommandations pour les corrections et les actions correctives.")
-    
+
     uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"], key="file_uploader")
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
@@ -169,6 +175,8 @@ def main():
                 display_recommendation(st.session_state.current_recommendation, st.session_state.current_index, requirement_number)
                 
                 if st.button("Nouvel essai", key="retry_recommendation"):
+                    # Réinitialiser complètement l'état pour la nouvelle tentative
+                    del st.session_state['current_recommendation']
                     prompt = prepare_prompt_for_non_conformity(current_non_conformity)
                     raw_recommendation = get_ai_recommendation_for_non_conformity(prompt, model)
                     if raw_recommendation:
@@ -189,7 +197,7 @@ def main():
                         
                         if st.session_state.current_index >= len(action_plan_df):
                             st.write("### Toutes les non-conformités ont été traitées.")
-                            st.write("Vous pouvez maintenant télécharger toutes les recommandations.")
+                            st.markdown('<div class="success">Toutes les non-conformités ont été traitées. Vous pouvez maintenant télécharger toutes les recommandations.</div>', unsafe_allow_html=True)
                             df_recommendations = pd.DataFrame(st.session_state.recommendations)
                             st.write(df_recommendations.to_html(classes='dataframe', index=False), unsafe_allow_html=True)
                             st.download_button(
@@ -200,6 +208,7 @@ def main():
                             )
                         else:
                             st.session_state.current_recommendation = None  # Réinitialiser pour la non-conformité suivante
+                            st.success("Recommandation acceptée. Passez à la non-conformité suivante.")
                     else:
                         st.warning("Certaines sections de la recommandation sont manquantes. Veuillez essayer à nouveau.")
 
