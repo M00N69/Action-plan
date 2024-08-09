@@ -129,6 +129,10 @@ def parse_recommendation(text):
     return rec
 
 def display_recommendation(recommendation, index, requirement_number):
+    if recommendation is None:
+        st.error("Aucune recommandation disponible à afficher.")
+        return
+
     st.markdown(f'<div class="recommendation-container">', unsafe_allow_html=True)
     st.markdown(f'<div class="recommendation-header">Non-conformité {index + 1} : Exigence {requirement_number}</div>', unsafe_allow_html=True)
 
@@ -170,6 +174,8 @@ def main():
                     if raw_recommendation:
                         recommendation = parse_recommendation(raw_recommendation)
                         st.session_state.current_recommendation = recommendation
+                    else:
+                        st.session_state.current_recommendation = None
 
             if 'current_recommendation' in st.session_state:
                 display_recommendation(st.session_state.current_recommendation, st.session_state.current_index, requirement_number)
@@ -182,10 +188,12 @@ def main():
                     if raw_recommendation:
                         recommendation = parse_recommendation(raw_recommendation)
                         st.session_state.current_recommendation = recommendation
-                        display_recommendation(recommendation, st.session_state.current_index, requirement_number)
+                    else:
+                        st.session_state.current_recommendation = None
+                    display_recommendation(recommendation, st.session_state.current_index, requirement_number)
                 
                 if st.button("Continuer", key="continue_to_next"):
-                    if all(st.session_state.current_recommendation.values()):
+                    if st.session_state.current_recommendation and all(st.session_state.current_recommendation.values()):
                         st.session_state.recommendations.append({
                             "Numéro d'exigence": current_non_conformity["Numéro d'exigence"],
                             "Correction proposée": st.session_state.current_recommendation["Correction proposée"],
@@ -209,7 +217,7 @@ def main():
                             st.session_state.current_recommendation = None  # Réinitialiser pour la non-conformité suivante
                             st.success("Recommandation acceptée. Passez à la non-conformité suivante.")
                     else:
-                        st.warning("Certaines sections de la recommandation sont manquantes. Veuillez essayer à nouveau.")
+                        st.warning("Certaines sections de la recommandation sont manquantes ou non générées. Veuillez essayer à nouveau.")
 
 if __name__ == "__main__":
     main()
