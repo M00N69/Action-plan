@@ -111,12 +111,15 @@ def parse_recommendation(text):
         "Preuves potentielles": "",
         "Actions correctives": ""
     }
-    if "Correction immédiate" in text:
-        rec["Correction proposée"] = text.split("Correction immédiate")[1].split("Preuves requises")[0].strip()
-    if "Preuves requises" in text:
-        rec["Preuves potentielles"] = text.split("Preuves requises")[1].split("Actions Correctives")[0].strip()
-    if "Actions Correctives" in text:
-        rec["Actions correctives"] = text.split("Actions Correctives")[1].strip()
+    try:
+        if "Correction immédiate" in text:
+            rec["Correction proposée"] = text.split("Correction immédiate")[1].split("Preuves requises")[0].strip()
+        if "Preuves requises" in text:
+            rec["Preuves potentielles"] = text.split("Preuves requises")[1].split("Actions Correctives")[0].strip()
+        if "Actions Correctives" in text:
+            rec["Actions correctives"] = text.split("Actions Correctives")[1].split("Remarques")[0].strip()
+    except IndexError:
+        st.error("La recommandation fournie par l'IA est mal structurée. Veuillez réessayer ou vérifier le prompt.")
     return rec
 
 def display_recommendation(recommendation, index, requirement_number):
@@ -196,14 +199,13 @@ def main():
                                 mime="text/csv",
                             )
                         else:
-                            # Simulate rerun by clearing the recommendation and advancing the index
-                            st.session_state.current_recommendation = None
-                            st.experimental_set_query_params(index=st.session_state.current_index)
+                            st.session_state.current_recommendation = None  # Réinitialiser pour la non-conformité suivante
                     else:
                         st.warning("Certaines sections de la recommandation sont manquantes. Veuillez essayer à nouveau.")
 
 if __name__ == "__main__":
     main()
+main()
 
 
 
