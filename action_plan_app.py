@@ -92,22 +92,13 @@ def load_action_plan(uploaded_file):
 
 def prepare_prompt(action_plan_df):
     prompt = """
-Je suis un expert en IFS Food 8, spécialisé dans l'analyse des non-conformités détectées lors des audits. 
-Vous devez fournir des recommandations détaillées pour chaque déviation identifiée dans le plan d'action suivant, en respectant les définitions et les standards IFS. Chaque recommandation doit inclure :
+Je suis un expert en IFS Food 8. Vous devez fournir des recommandations détaillées pour chaque déviation identifiée dans le plan d'action suivant. 
+Pour chaque exigence, répondez dans le format suivant :
+- **Correction immédiate** : [Détail de la correction]
+- **Preuves requises** : [Liste des preuves nécessaires]
+- **Actions Correctives** : [Détail des actions correctives]
 
-1. **Correction immédiate** : Une action visant à éliminer la non-conformité détectée. La correction doit se concentrer uniquement sur la résolution du problème observé, sans inclure la recherche des causes. 
-   Exemple : Si un équipement n'est pas en bon état de propreté, la correction pourrait être de le nettoyer immédiatement.
-
-2. **Preuves requises** : Une liste de preuves nécessaires pour démontrer que la correction a été effectuée avec succès. 
-   Exemple : Photos avant/après, factures des matériaux utilisés, enregistrements de formation, rapports d'intervention.
-
-3. **Actions Correctives** : Une action visant à éliminer la cause sous-jacente de la non-conformité afin de prévenir sa réapparition. Les actions correctives doivent inclure l'identification des causes profondes, telles que la méthode des 5 Pourquoi ou le diagramme d'Ishikawa.
-   Exemple : Si un équipement n'est pas intégré dans le plan de nettoyage, l'action corrective pourrait être d'intégrer cet équipement dans le plan de nettoyage et de former le personnel.
-
-Veuillez vous assurer que chaque recommandation est exhaustive et permet d’éliminer la déviation ainsi que d'éviter sa réapparition.
-
-Voici les non-conformités détectées dans le plan d'action :
-
+Voici les non-conformités détectées :
 """
     for _, row in action_plan_df.iterrows():
         requirement_number = row["Numéro d'exigence"]
@@ -115,10 +106,7 @@ Voici les non-conformités détectées dans le plan d'action :
         prompt += f"\n- Exigence {requirement_number}: {description}"
 
     prompt += """
-Répondez pour chaque exigence avec le format suivant :
-- **Correction immédiate** : [Détail de la correction]
-- **Preuves requises** : [Liste des preuves nécessaires]
-- **Actions Correctives** : [Détail des actions correctives]
+Répondez pour chaque exigence.
 """
 
     return prompt
@@ -129,13 +117,17 @@ def get_ai_recommendations(prompt, model, action_plan_df):
         convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
         response = convo.send_message(prompt)
         recommendations_text = response.text
+        
+        # Debug: Afficher la réponse brute pour vérification
+        st.write("Réponse brute de l'IA:")
+        st.write(recommendations_text)
+        
         recommendations = parse_recommendations(recommendations_text)
         
-        # S'assurer que nous avons une recommandation pour chaque non-conformité
         if len(recommendations) < len(action_plan_df):
             st.warning("Certaines non-conformités n'ont pas reçu de recommandations complètes.")
         
-        return recommendations[:len(action_plan_df)]  # Tronquer si trop de recommandations
+        return recommendations[:len(action_plan_df)]
     except ResourceExhausted as e:
         st.error(f"Les ressources de l'API sont épuisées : {str(e)}")
     except Exception as e:
@@ -145,7 +137,7 @@ def get_ai_recommendations(prompt, model, action_plan_df):
 
 def parse_recommendations(text):
     recommendations = []
-    sections = text.split("Non-conformité")
+    sections = text.split("- Exigence")
     for section in sections[1:]:
         rec = {
             "Correction proposée": "",
@@ -153,9 +145,9 @@ def parse_recommendations(text):
             "Actions correctives": ""
         }
         if "Correction :" in section:
-            rec["Correction proposée"] = section.split("Correction :")[1].split("Preuves potentielles :")[0].strip()
-        if "Preuves potentielles :" in section:
-            rec["Preuves potentielles"] = section.split("Preuves potentielles :")[1].split("Actions Correctives :")[0].strip()
+            rec["Correction proposée"] = section.split("Correction :")[1].split("Preuves requises :")[0].strip()
+        if "Preuves requises :" in section:
+            rec["Preuves potentielles"] = section.split("Preuves requises :")[1].split("Actions Correctives :")[0].strip()
         if "Actions Correctives :" in section:
             rec["Actions correctives"] = section.split("Actions Correctives :")[1].strip()
         recommendations.append(rec)
@@ -206,7 +198,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
