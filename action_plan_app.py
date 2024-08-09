@@ -137,8 +137,9 @@ def main():
                 recommendations = get_ai_recommendations(prompt, model, len(action_plan_df))
                 display_recommendations(recommendations, action_plan_df)
 
-if you open and start the code."
+if __name__ == "__main__":
     main()
+
 
 
 
