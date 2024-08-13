@@ -58,23 +58,7 @@ def add_css_styles():
 # Fonction pour configurer le modèle d'IA de Google
 def configure_model():
     genai.configure(api_key=st.secrets["api_key"])
-    generation_config = {
-        "temperature": 0.7,
-        "top_p": 0.9,
-        "top_k": 50,
-        "max_output_tokens": 1024,
-    }
-    safety_settings = [
-        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-    ]
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
-        generation_config=generation_config,
-        safety_settings=safety_settings
-    )
+    model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest")
     return model
 
 # Fonction pour charger le fichier Excel avec le plan d'action
@@ -128,7 +112,8 @@ def main():
     st.markdown('<div class="main-header">Assistant VisiPilot pour Plan d\'Actions IFS</div>', unsafe_allow_html=True)
     st.write("Téléchargez votre plan d'action et obtenez des recommandations pour les corrections et les actions correctives.")
 
-    uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"], key="file_uploader")
+    uploaded_file = st.file_uploader("Téléchargez votre plan d'action (fichier Excel)", type=["xlsx"])
+    
     if uploaded_file:
         action_plan_df = load_action_plan(uploaded_file)
         if action_plan_df is not None:
@@ -161,7 +146,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
