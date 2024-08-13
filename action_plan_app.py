@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import requests
 import google.generativeai as genai
 from string import Template
 
@@ -84,7 +85,6 @@ def handle_ai_errors(func):
             return None
     return wrapper
 
-@st.cache_data(ttl=86400)
 def load_action_plan(uploaded_file):
     try:
         action_plan_df = pd.read_excel(uploaded_file, header=12)
@@ -96,27 +96,68 @@ def load_action_plan(uploaded_file):
         st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
         return None
 
-@handle_ai_errors
-def generate_ai_recommendation(non_conformity, model):
-    prompt_template = Template("""
+def load_guide_ifsv8(csv_url):
+    """
+    Charge le guide IFSv8 depuis une URL CSV.
+    """
+    response = requests.get(csv_url)
+    guide_df = pd.read_csv(pd.compat.StringIO(response.text), sep=';')
+    return guide_df
+
+def get_guide_context(exigence_num, guide_df):
+    """
+    Recherche les informations pertinentes dans le guide IFSv8 pour une exigence spécifique.
+    """
+    context = guide_df[guide_df['Exigence'].str.contains(exigence_num, na=False)]
+    if not context.empty:
+        guidelines = context['Guidelines'].iloc[0]  # Assurez-vous que la colonne existe
+        return guidelines
+    else:
+        return "Aucune information spécifique trouvée dans le guide pour cette exigence."
+
+def generate_advanced_prompt(non_conformity, guide_df):
+    """
+    Génère un prompt détaillé en utilisant le guide IFSv8 comme contexte.
+    """
+    exigence_num = non_conformity.get("Numéro d'exigence", "Exigence non spécifiée")
+    non_conformity_desc = non_conformity.get("Exigence IFS Food 8", "Non-conformité non spécifiée")
+    
+    # Récupérer le contexte du guide IFSv8
+    guide_context = get_guide_context(exigence_num, guide_df)
+
+    # Créer un prompt détaillé
+    prompt = f"""
     Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :
-    
-    - **Exigence** : $exigence
-    - **Non-conformité** : $non_conformity
-    
+
+    - **Exigence** : {exigence_num}
+    - **Non-conformité** : {non_conformity_desc}
+
+    Contexte supplémentaire tiré du guide IFSv8 :
+    {guide_context}
+
     Fournissez une recommandation structurée et détaillée comprenant :
     - **Correction immédiate** (action spécifique et claire)
     - **Preuves requises** (documents précis nécessaires)
     - **Actions Correctives** (mesures à long terme)
-    """)
+    """
+    
+    return prompt
 
-    prompt = prompt_template.substitute(
-        exigence=non_conformity.get("Numéro d'exigence", "Exigence non spécifiée"),
-        non_conformity=non_conformity.get("Exigence IFS Food 8", "Non-conformité non spécifiée")
-    )
-
+@handle_ai_errors
+def generate_ai_recommendation(non_conformity, model, guide_df):
+    prompt = generate_advanced_prompt(non_conformity, guide_df)
+    
     convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
     response = convo.send_message(prompt)
+    
+    if response is None or response.text.strip() == "":
+        st.warning("L'IA n'a pas pu générer de réponse. Utilisation d'une valeur par défaut.")
+        return {
+            "Correction proposée": "Aucune recommandation générée.",
+            "Preuves potentielles": "Aucune preuve recommandée.",
+            "Actions correctives": "Aucune action corrective suggérée."
+        }
+    
     return response.text if response else None
 
 def parse_recommendation(text):
@@ -138,25 +179,45 @@ def parse_recommendation(text):
         st.error("La recommandation fournie par l'IA est mal structurée ou incomplète. Veuillez essayer à nouveau.")
     return rec
 
-def format_recommendation_text(recommendation):
-    formatted_text = ""
-    for key, value in recommendation.items():
-        formatted_text += f"**{key}** : {value}\n\n"
-    return formatted_text
+def display_recommendation(recommendation, index, requirement_number):
+    if recommendation is None:
+        st.error("La recommandation n'a pas pu être générée ou est vide. Veuillez réessayer.")
+        return
 
-def generate_summary_table(action_plan_df, model):
+    if not isinstance(recommendation, dict):
+        st.error("Erreur interne : La recommandation n'est pas dans le bon format.")
+        return
+
+    st.markdown(f'<div class="recommendation-container">', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="recommendation-header">Recommandation pour la Non-conformité {index + 1} : Exigence {requirement_number}</h2>', unsafe_allow_html=True)
+
+    for key, value in recommendation.items():
+        if value:
+            st.markdown(f'<div class="recommendation-content"><b>{key} :</b> {value}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="recommendation-content warning">Recommandation manquante pour {key}</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def generate_summary_table(action_plan_df, model, guide_df):
     summary_data = []
 
     for index, non_conformity in action_plan_df.iterrows():
-        raw_recommendation = generate_ai_recommendation(non_conformity, model)
+        raw_recommendation = generate_ai_recommendation(non_conformity, model, guide_df)
         if raw_recommendation:
             recommendation = parse_recommendation(raw_recommendation)
+            if recommendation is None:
+                recommendation = {
+                    "Correction proposée": "Aucune recommandation générée.",
+                    "Preuves potentielles": "Aucune preuve recommandée.",
+                    "Actions correctives": "Aucune action corrective suggérée."
+                }
             summary_data.append({
                 "Numéro de non-conformité": index + 1,
                 "Numéro d'exigence": non_conformity["Numéro d'exigence"],
-                "Correction proposée": recommendation["Correction proposée"],
-                "Preuves potentielles": recommendation["Preuves potentielles"],
-                "Actions correctives": recommendation["Actions correctives"],
+                "Correction proposée": recommendation.get("Correction proposée", "Non disponible"),
+                "Preuves potentielles": recommendation.get("Preuves potentielles", "Non disponible"),
+                "Actions correctives": recommendation.get("Actions correctives", "Non disponible"),
             })
 
     return pd.DataFrame(summary_data)
@@ -175,8 +236,12 @@ def main():
             st.markdown('<div class="dataframe-container">' + action_plan_df.to_html(classes='dataframe', index=False) + '</div>', unsafe_allow_html=True)
             model = configure_model()
 
+            # Charger le guide IFSv8 depuis le CSV sur GitHub
+            guide_url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
+            guide_df = load_guide_ifsv8(guide_url)
+
             # Génération du tableau récapitulatif pour toutes les non-conformités
-            summary_df = generate_summary_table(action_plan_df, model)
+            summary_df = generate_summary_table(action_plan_df, model, guide_df)
             
             st.subheader("Résumé des Recommandations")
             st.write(summary_df.to_html(classes='dataframe', index=False, escape=False), unsafe_allow_html=True)
@@ -190,6 +255,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
