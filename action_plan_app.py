@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
+from string import Template
 
 st.set_page_config(layout="wide")
 
+# Ajout des styles CSS pour personnaliser l'interface
 def add_css_styles():
     st.markdown(
         """
@@ -53,6 +55,7 @@ def add_css_styles():
         unsafe_allow_html=True
     )
 
+# Configuration du modèle d'IA
 def configure_model():
     genai.configure(api_key=st.secrets["api_key"])
     generation_config = {
@@ -74,6 +77,17 @@ def configure_model():
     )
     return model
 
+# Gestion centralisée des erreurs avec un décorateur
+def handle_ai_errors(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            st.error(f"Une erreur inattendue s'est produite: {str(e)}")
+            return None
+    return wrapper
+
+# Chargement du plan d'action depuis un fichier Excel
 @st.cache_data(ttl=86400)
 def load_action_plan(uploaded_file):
     try:
@@ -86,29 +100,31 @@ def load_action_plan(uploaded_file):
         st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
         return None
 
-def prepare_prompt_for_non_conformity(non_conformity):
-    prompt = f"""
-Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :
+# Génération et obtention des recommandations d'IA (fonction combinée)
+@handle_ai_errors
+def generate_ai_recommendation(non_conformity, model):
+    prompt_template = Template("""
+    Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :
+    
+    - **Exigence** : $exigence
+    - **Non-conformité** : $non_conformity
+    
+    Fournissez une recommandation structurée et détaillée comprenant :
+    - **Correction immédiate** (action spécifique et claire)
+    - **Preuves requises** (documents précis nécessaires)
+    - **Actions Correctives** (mesures à long terme)
+    """)
 
-- **Exigence** : {non_conformity['Numéro d\'exigence']}
-- **Non-conformité** : {non_conformity['Exigence IFS Food 8']}
+    prompt = prompt_template.substitute(
+        exigence=non_conformity.get("Numéro d'exigence", "Exigence non spécifiée"),
+        non_conformity=non_conformity.get("Exigence IFS Food 8", "Non-conformité non spécifiée")
+    )
 
-Fournissez une recommandation structurée et détaillée comprenant :
-- **Correction immédiate** (action spécifique et claire)
-- **Preuves requises** (documents précis nécessaires)
-- **Actions Correctives** (mesures à long terme)
-"""
-    return prompt
+    convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
+    response = convo.send_message(prompt)
+    return response.text if response else None
 
-def get_ai_recommendation_for_non_conformity(prompt, model):
-    try:
-        convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
-        response = convo.send_message(prompt)
-        return response.text
-    except Exception as e:
-        st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-        return None
-
+# Parsing des recommandations reçues de l'IA
 def parse_recommendation(text):
     rec = {
         "Correction proposée": "",
@@ -128,6 +144,7 @@ def parse_recommendation(text):
         st.error("La recommandation fournie par l'IA est mal structurée ou incomplète. Veuillez essayer à nouveau.")
     return rec
 
+# Affichage des recommandations dans l'interface utilisateur
 def display_recommendation(recommendation, index, requirement_number):
     st.markdown(f'<div class="recommendation-container">', unsafe_allow_html=True)
     st.markdown(f'<h2 class="recommendation-header">Recommandation pour la Non-conformité {index + 1} : Exigence {requirement_number}</h2>', unsafe_allow_html=True)
@@ -140,6 +157,7 @@ def display_recommendation(recommendation, index, requirement_number):
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+# Logique principale de l'application Streamlit
 def main():
     add_css_styles()
 
@@ -158,10 +176,7 @@ def main():
                 st.session_state.current_index = 0
                 st.session_state.recommendations = []
 
-            # --- Afficher le numéro de la non-conformité actuelle et le total ---
             st.markdown(f"**Non-conformité {st.session_state.current_index + 1} / {len(action_plan_df)}**")
-
-            # --- Afficher un indicateur de progression ---
             progress_bar = st.progress(st.session_state.current_index / len(action_plan_df))
 
             current_non_conformity = action_plan_df.iloc[st.session_state.current_index]
@@ -170,8 +185,7 @@ def main():
 
             if 'current_recommendation' not in st.session_state:
                 if st.button("Obtenir Recommandation", key="get_recommendation"):
-                    prompt = prepare_prompt_for_non_conformity(current_non_conformity)
-                    raw_recommendation = get_ai_recommendation_for_non_conformity(prompt, model)
+                    raw_recommendation = generate_ai_recommendation(current_non_conformity, model)
                     if raw_recommendation:
                         recommendation = parse_recommendation(raw_recommendation)
                         st.session_state.current_recommendation = recommendation
@@ -181,17 +195,14 @@ def main():
             if 'current_recommendation' in st.session_state:
                 display_recommendation(st.session_state.current_recommendation, st.session_state.current_index, requirement_number)
                 
-                # --- Afficher un bouton "Précédent" si applicable ---
                 if st.session_state.current_index > 0:
                     if st.button("Précédent", key="previous_recommendation"):
                         st.session_state.current_index -= 1
                         st.session_state.current_recommendation = None
 
-                # --- Afficher un bouton "Nouvel essai" pour régénérer la recommandation ---
                 if st.button("Nouvel essai", key="retry_recommendation"):
                     del st.session_state['current_recommendation']
-                    prompt = prepare_prompt_for_non_conformity(current_non_conformity)
-                    raw_recommendation = get_ai_recommendation_for_non_conformity(prompt, model)
+                    raw_recommendation = generate_ai_recommendation(current_non_conformity, model)
                     if raw_recommendation:
                         recommendation = parse_recommendation(raw_recommendation)
                         st.session_state.current_recommendation = recommendation
@@ -199,7 +210,6 @@ def main():
                         st.session_state.current_recommendation = None
                     display_recommendation(recommendation, st.session_state.current_index, requirement_number)
                 
-                # --- Afficher un bouton "Accepter et Continuer" ---
                 if st.button("Accepter et Continuer", key="continue_to_next"):
                     if st.session_state.current_recommendation and all(st.session_state.current_recommendation.values()):
                         st.session_state.recommendations.append({
@@ -228,7 +238,6 @@ def main():
                     else:
                         st.warning("Certaines sections de la recommandation sont manquantes ou non générées. Veuillez essayer à nouveau.")
 
-            # --- Afficher un résumé des recommandations ---
             st.subheader("Résumé des Recommandations")
             if st.session_state.recommendations:
                 df_recommendations = pd.DataFrame(st.session_state.recommendations)
