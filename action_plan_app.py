@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import requests
-import io
 import google.generativeai as genai
 from string import Template
 
@@ -96,34 +94,6 @@ def load_action_plan(uploaded_file):
     except Exception as e:
         st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
         return None
-
-def load_guide_ifsv8(csv_url):
-    """
-    Charge le guide IFSv8 depuis une URL CSV.
-    Essaie de lire le fichier de manière robuste en gérant les sauts de ligne et les guillemets.
-    """
-    response = requests.get(csv_url)
-    response.raise_for_status()  # Assure que la requête HTTP a réussi
-    content = response.text
-
-    # Afficher les premières lignes du contenu brut pour diagnostic
-    st.write("Contenu brut du fichier CSV :")
-    st.write(content[:1000])  # Affiche les premiers 1000 caractères du fichier
-
-    # Essayer de lire le fichier CSV en tenant compte des complexités
-    try:
-        guide_df = pd.read_csv(
-            io.StringIO(content),
-            sep=',',  # Utilisation de la virgule comme séparateur
-            quotechar='"',  # Gestion des guillemets pour les valeurs complexes
-            engine='python',  # Utilisation de l'analyseur Python pour plus de flexibilité
-            error_bad_lines=False  # Ignorer les lignes mal formées
-        )
-    except pd.errors.ParserError as e:
-        st.error(f"Erreur lors de la lecture du fichier CSV : {e}")
-        return None
-    
-    return guide_df
 
 def get_guide_context(exigence_num, guide_df):
     """
@@ -258,21 +228,21 @@ def main():
             model = configure_model()
 
             # Charger le guide IFSv8 depuis le CSV sur GitHub
-            guide_url = "https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv"
-            guide_df = load_guide_ifsv8(guide_url)
+            guide_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
 
-            # Génération du tableau récapitulatif pour toutes les non-conformités
-            summary_df = generate_summary_table(action_plan_df, model, guide_df)
-            
-            st.subheader("Résumé des Recommandations")
-            st.write(summary_df.to_html(classes='dataframe', index=False, escape=False), unsafe_allow_html=True)
+            if guide_df is not None:
+                # Génération du tableau récapitulatif pour toutes les non-conformités
+                summary_df = generate_summary_table(action_plan_df, model, guide_df)
+                
+                st.subheader("Résumé des Recommandations")
+                st.write(summary_df.to_html(classes='dataframe', index=False, escape=False), unsafe_allow_html=True)
 
-            st.download_button(
-                label="Télécharger les recommandations",
-                data=summary_df.to_csv(index=False),
-                file_name="recommandations_ifs_food.csv",
-                mime="text/csv",
-            )
+                st.download_button(
+                    label="Télécharger les recommandations",
+                    data=summary_df.to_csv(index=False),
+                    file_name="recommandations_ifs_food.csv",
+                    mime="text/csv",
+                )
 
 if __name__ == "__main__":
     main()
