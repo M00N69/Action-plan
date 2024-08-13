@@ -109,7 +109,7 @@ def generate_ai_recommendation(prompt, model):
 def display_recommendations(recommendations_df):
     for index, row in recommendations_df.iterrows():
         st.markdown(f"### Numéro d'exigence: {row['Numéro d'exigence']}")
-        st.markdown(row['Recommandation'])
+        st.markdown(row["Recommandation"])
 
 # Fonction principale
 def main():
