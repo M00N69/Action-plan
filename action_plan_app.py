@@ -5,7 +5,6 @@ from string import Template
 
 st.set_page_config(layout="wide")
 
-# Ajout des styles CSS pour personnaliser l'interface
 def add_css_styles():
     st.markdown(
         """
@@ -55,7 +54,6 @@ def add_css_styles():
         unsafe_allow_html=True
     )
 
-# Configuration du modèle d'IA
 def configure_model():
     genai.configure(api_key=st.secrets["api_key"])
     generation_config = {
@@ -77,7 +75,6 @@ def configure_model():
     )
     return model
 
-# Gestion centralisée des erreurs avec un décorateur
 def handle_ai_errors(func):
     def wrapper(*args, **kwargs):
         try:
@@ -87,7 +84,6 @@ def handle_ai_errors(func):
             return None
     return wrapper
 
-# Chargement du plan d'action depuis un fichier Excel
 @st.cache_data(ttl=86400)
 def load_action_plan(uploaded_file):
     try:
@@ -100,7 +96,6 @@ def load_action_plan(uploaded_file):
         st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
         return None
 
-# Génération et obtention des recommandations d'IA (fonction combinée)
 @handle_ai_errors
 def generate_ai_recommendation(non_conformity, model):
     prompt_template = Template("""
@@ -124,7 +119,6 @@ def generate_ai_recommendation(non_conformity, model):
     response = convo.send_message(prompt)
     return response.text if response else None
 
-# Parsing des recommandations reçues de l'IA
 def parse_recommendation(text):
     rec = {
         "Correction proposée": "",
@@ -144,8 +138,15 @@ def parse_recommendation(text):
         st.error("La recommandation fournie par l'IA est mal structurée ou incomplète. Veuillez essayer à nouveau.")
     return rec
 
-# Affichage des recommandations dans l'interface utilisateur
 def display_recommendation(recommendation, index, requirement_number):
+    if recommendation is None:
+        st.error("La recommandation n'a pas pu être générée. Veuillez réessayer.")
+        return
+
+    if not isinstance(recommendation, dict):
+        st.error("Erreur interne : La recommandation n'est pas dans le bon format.")
+        return
+
     st.markdown(f'<div class="recommendation-container">', unsafe_allow_html=True)
     st.markdown(f'<h2 class="recommendation-header">Recommandation pour la Non-conformité {index + 1} : Exigence {requirement_number}</h2>', unsafe_allow_html=True)
 
@@ -157,7 +158,6 @@ def display_recommendation(recommendation, index, requirement_number):
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Logique principale de l'application Streamlit
 def main():
     add_css_styles()
 
@@ -213,6 +213,7 @@ def main():
                 if st.button("Accepter et Continuer", key="continue_to_next"):
                     if st.session_state.current_recommendation and all(st.session_state.current_recommendation.values()):
                         st.session_state.recommendations.append({
+                            "Numéro de non-conformité": st.session_state.current_index + 1,
                             "Numéro d'exigence": current_non_conformity["Numéro d'exigence"],
                             "Correction proposée": st.session_state.current_recommendation["Correction proposée"],
                             "Preuves potentielles": st.session_state.current_recommendation["Preuves potentielles"],
@@ -251,6 +252,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
