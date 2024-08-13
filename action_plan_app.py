@@ -124,16 +124,16 @@ def display_recommendations(recommendations_df):
 def generate_text_file(recommendations_df):
     text_content = ""
     for index, row in recommendations_df.iterrows():
-        text_content += f"Numéro d'exigence: {row['Numéro d'exigence']}\n"
-        text_content += f"{row['Recommandation']}\n\n"
+        text_content += f"""Numéro d'exigence: {row["Numéro d'exigence"]}\n"""
+        text_content += f"""{row["Recommandation"]}\n\n"""
     return text_content
 
 # Fonction pour créer un fichier DOCX des recommandations
 def generate_docx_file(recommendations_df):
     doc = Document()
     for index, row in recommendations_df.iterrows():
-        doc.add_heading(f"Numéro d'exigence: {row['Numéro d'exigence']}", level=2)
-        doc.add_paragraph(row['Recommandation'])
+        doc.add_heading(f"""Numéro d'exigence: {row["Numéro d'exigence"]}""", level=2)
+        doc.add_paragraph(row["Recommandation"])
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -147,9 +147,9 @@ def generate_pdf_file(recommendations_df):
     pdf.set_font("Arial", size=12)
     for index, row in recommendations_df.iterrows():
         pdf.set_font("Arial", style='B', size=14)
-        pdf.cell(200, 10, txt=f"Numéro d'exigence: {row['Numéro d'exigence']}", ln=True)
+        pdf.cell(200, 10, txt=f"""Numéro d'exigence: {row["Numéro d'exigence"]}""", ln=True)
         pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, txt=row['Recommandation'])
+        pdf.multi_cell(0, 10, txt=row["Recommandation"])
         pdf.ln(10)
     buffer = BytesIO()
     pdf.output(buffer)
