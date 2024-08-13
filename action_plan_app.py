@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
+import io
 import google.generativeai as genai
 from string import Template
 
@@ -101,7 +102,8 @@ def load_guide_ifsv8(csv_url):
     Charge le guide IFSv8 depuis une URL CSV.
     """
     response = requests.get(csv_url)
-    guide_df = pd.read_csv(pd.compat.StringIO(response.text), sep=';')
+    response.raise_for_status()  # Assure que la requête HTTP a réussi
+    guide_df = pd.read_csv(io.StringIO(response.text), sep=';')
     return guide_df
 
 def get_guide_context(exigence_num, guide_df):
@@ -255,6 +257,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
