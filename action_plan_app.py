@@ -100,19 +100,38 @@ def load_action_plan(uploaded_file):
 def load_guide_ifsv8(csv_url):
     """
     Charge le guide IFSv8 depuis une URL CSV.
+    Essaie de lire le fichier de manière robuste en gérant les sauts de ligne et les guillemets.
     """
     response = requests.get(csv_url)
     response.raise_for_status()  # Assure que la requête HTTP a réussi
-    guide_df = pd.read_csv(io.StringIO(response.text), sep=';')
+    content = response.text
+
+    # Afficher les premières lignes du contenu brut pour diagnostic
+    st.write("Contenu brut du fichier CSV :")
+    st.write(content[:1000])  # Affiche les premiers 1000 caractères du fichier
+
+    # Essayer de lire le fichier CSV en tenant compte des complexités
+    try:
+        guide_df = pd.read_csv(
+            io.StringIO(content),
+            sep=',',  # Utilisation de la virgule comme séparateur
+            quotechar='"',  # Gestion des guillemets pour les valeurs complexes
+            engine='python',  # Utilisation de l'analyseur Python pour plus de flexibilité
+            error_bad_lines=False  # Ignorer les lignes mal formées
+        )
+    except pd.errors.ParserError as e:
+        st.error(f"Erreur lors de la lecture du fichier CSV : {e}")
+        return None
+    
     return guide_df
 
 def get_guide_context(exigence_num, guide_df):
     """
     Recherche les informations pertinentes dans le guide IFSv8 pour une exigence spécifique.
     """
-    context = guide_df[guide_df['Exigence'].str.contains(exigence_num, na=False)]
+    context = guide_df[guide_df['NUM_REQ'].str.contains(exigence_num, na=False)]
     if not context.empty:
-        guidelines = context['Guidelines'].iloc[0]  # Assurez-vous que la colonne existe
+        guidelines = context['Good practice'].iloc[0]  # Assurez-vous que la colonne existe
         return guidelines
     else:
         return "Aucune information spécifique trouvée dans le guide pour cette exigence."
