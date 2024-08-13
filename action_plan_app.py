@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-from string import Template
 
+# Configurer la page de l'application
 st.set_page_config(layout="wide")
 
+# Fonction pour ajouter des styles CSS personnalisés
 def add_css_styles():
     st.markdown(
         """
@@ -54,6 +55,7 @@ def add_css_styles():
         unsafe_allow_html=True
     )
 
+# Fonction pour configurer le modèle d'IA de Google
 def configure_model():
     genai.configure(api_key=st.secrets["api_key"])
     generation_config = {
@@ -75,19 +77,10 @@ def configure_model():
     )
     return model
 
-def handle_ai_errors(func):
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            st.error(f"Une erreur inattendue s'est produite: {str(e)}")
-            return None
-    return wrapper
-
+# Fonction pour charger le fichier Excel avec le plan d'action
 def load_action_plan(uploaded_file):
     try:
         action_plan_df = pd.read_excel(uploaded_file, header=12)
-        action_plan_df.columns = [col.strip() for col in action_plan_df.columns]
         expected_columns = ["Numéro d'exigence", "Exigence IFS Food 8", "Notation", "Explication (par l’auditeur/l’évaluateur)"]
         action_plan_df = action_plan_df[expected_columns]
         return action_plan_df
@@ -95,37 +88,20 @@ def load_action_plan(uploaded_file):
         st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
         return None
 
-def get_guide_context(exigence_num, guide_df):
-    """
-    Recherche les informations pertinentes dans le guide IFSv8 pour une exigence spécifique.
-    """
-    context = guide_df[guide_df['NUM_REQ'].str.contains(exigence_num, na=False)]
-    if not context.empty:
-        guidelines = context['Good practice'].iloc[0]  # Assurez-vous que la colonne existe
-        return guidelines
-    else:
-        return "Aucune information spécifique trouvée dans le guide pour cette exigence."
-
-def generate_advanced_prompt(non_conformity, guide_df):
-    """
-    Génère un prompt détaillé en utilisant le guide IFSv8 comme contexte.
-    """
+# Fonction pour générer un prompt basé sur une non-conformité
+def generate_prompt(non_conformity, guide_df):
     exigence_num = non_conformity.get("Numéro d'exigence", "Exigence non spécifiée")
     non_conformity_desc = non_conformity.get("Exigence IFS Food 8", "Non-conformité non spécifiée")
     
-    # Récupérer le contexte du guide IFSv8
-    guide_context = get_guide_context(exigence_num, guide_df)
+    context = guide_df[guide_df['NUM_REQ'].str.contains(exigence_num, na=False)]
+    guidelines = context['Good practice'].iloc[0] if not context.empty else "Aucune information spécifique trouvée dans le guide pour cette exigence."
 
-    # Créer un prompt détaillé
     prompt = f"""
     Je suis un expert en IFS Food 8. Voici une non-conformité détectée lors d'un audit :
-
     - **Exigence** : {exigence_num}
     - **Non-conformité** : {non_conformity_desc}
-
     Contexte supplémentaire tiré du guide IFSv8 :
-    {guide_context}
-
+    {guidelines}
     Fournissez une recommandation structurée et détaillée comprenant :
     - **Correction immédiate** (action spécifique et claire)
     - **Preuves requises** (documents précis nécessaires)
@@ -134,85 +110,17 @@ def generate_advanced_prompt(non_conformity, guide_df):
     
     return prompt
 
-@handle_ai_errors
-def generate_ai_recommendation(non_conformity, model, guide_df):
-    prompt = generate_advanced_prompt(non_conformity, guide_df)
-    
-    convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
-    response = convo.send_message(prompt)
-    
-    if response is None or response.text.strip() == "":
-        st.warning("L'IA n'a pas pu générer de réponse. Utilisation d'une valeur par défaut.")
-        return {
-            "Correction proposée": "Aucune recommandation générée.",
-            "Preuves potentielles": "Aucune preuve recommandée.",
-            "Actions correctives": "Aucune action corrective suggérée."
-        }
-    
-    return response.text if response else None
-
-def parse_recommendation(text):
-    rec = {
-        "Correction proposée": "",
-        "Preuves potentielles": "",
-        "Actions correctives": ""
-    }
+# Fonction pour générer une recommandation à partir de l'IA
+def generate_ai_recommendation(prompt, model):
     try:
-        if "Correction immédiate" in text:
-            rec["Correction proposée"] = text.split("Correction immédiate")[1].split("Preuves requises")[0].strip()
-        if "Preuves requises" in text:
-            rec["Preuves potentielles"] = text.split("Preuves requises")[1].split("Actions Correctives")[0].strip()
-        if "Actions Correctives" in text:
-            rec["Actions correctives"] = text.split("Actions Correctives")[1].split("Remarques")[0].strip()
-        else:
-            rec["Actions correctives"] = "Aucune action corrective spécifique n'a été proposée dans cette recommandation."
-    except IndexError:
-        st.error("La recommandation fournie par l'IA est mal structurée ou incomplète. Veuillez essayer à nouveau.")
-    return rec
+        convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
+        response = convo.send_message(prompt)
+        return response.text if response else None
+    except Exception as e:
+        st.error(f"Erreur lors de la génération de la recommandation: {str(e)}")
+        return None
 
-def display_recommendation(recommendation, index, requirement_number):
-    if recommendation is None:
-        st.error("La recommandation n'a pas pu être générée ou est vide. Veuillez réessayer.")
-        return
-
-    if not isinstance(recommendation, dict):
-        st.error("Erreur interne : La recommandation n'est pas dans le bon format.")
-        return
-
-    st.markdown(f'<div class="recommendation-container">', unsafe_allow_html=True)
-    st.markdown(f'<h2 class="recommendation-header">Recommandation pour la Non-conformité {index + 1} : Exigence {requirement_number}</h2>', unsafe_allow_html=True)
-
-    for key, value in recommendation.items():
-        if value:
-            st.markdown(f'<div class="recommendation-content"><b>{key} :</b> {value}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="recommendation-content warning">Recommandation manquante pour {key}</div>', unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def generate_summary_table(action_plan_df, model, guide_df):
-    summary_data = []
-
-    for index, non_conformity in action_plan_df.iterrows():
-        raw_recommendation = generate_ai_recommendation(non_conformity, model, guide_df)
-        if raw_recommendation:
-            recommendation = parse_recommendation(raw_recommendation)
-            if recommendation is None:
-                recommendation = {
-                    "Correction proposée": "Aucune recommandation générée.",
-                    "Preuves potentielles": "Aucune preuve recommandée.",
-                    "Actions correctives": "Aucune action corrective suggérée."
-                }
-            summary_data.append({
-                "Numéro de non-conformité": index + 1,
-                "Numéro d'exigence": non_conformity["Numéro d'exigence"],
-                "Correction proposée": recommendation.get("Correction proposée", "Non disponible"),
-                "Preuves potentielles": recommendation.get("Preuves potentielles", "Non disponible"),
-                "Actions correctives": recommendation.get("Actions correctives", "Non disponible"),
-            })
-
-    return pd.DataFrame(summary_data)
-
+# Fonction principale
 def main():
     add_css_styles()
 
@@ -230,22 +138,30 @@ def main():
             # Charger le guide IFSv8 depuis le CSV sur GitHub
             guide_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
 
-            if guide_df is not None:
-                # Génération du tableau récapitulatif pour toutes les non-conformités
-                summary_df = generate_summary_table(action_plan_df, model, guide_df)
-                
-                st.subheader("Résumé des Recommandations")
-                st.write(summary_df.to_html(classes='dataframe', index=False, escape=False), unsafe_allow_html=True)
+            # Générer et afficher les recommandations pour chaque non-conformité
+            recommendations = []
+            for _, non_conformity in action_plan_df.iterrows():
+                prompt = generate_prompt(non_conformity, guide_df)
+                recommendation_text = generate_ai_recommendation(prompt, model)
+                if recommendation_text:
+                    recommendations.append({
+                        "Numéro d'exigence": non_conformity["Numéro d'exigence"],
+                        "Recommandation": recommendation_text
+                    })
 
+            if recommendations:
+                recommendations_df = pd.DataFrame(recommendations)
+                st.write(recommendations_df.to_html(classes='dataframe', index=False, escape=False), unsafe_allow_html=True)
                 st.download_button(
                     label="Télécharger les recommandations",
-                    data=summary_df.to_csv(index=False),
+                    data=recommendations_df.to_csv(index=False),
                     file_name="recommandations_ifs_food.csv",
                     mime="text/csv",
                 )
 
 if __name__ == "__main__":
     main()
+
 
 
 
