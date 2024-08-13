@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import time
 import google.generativeai as genai
+from io import BytesIO
+from docx import Document
+from fpdf import FPDF
 
 # Configurer la page de l'application
 st.set_page_config(layout="wide")
@@ -42,6 +45,12 @@ def add_css_styles():
             margin-bottom: 10px;
             font-size: 16px;
             line-height: 1.5;
+        }
+        .spinner-message {
+            font-size: 22px;
+            color: red;
+            text-align: center;
+            margin-top: 20px;
         }
         .warning {
             color: red;
@@ -111,6 +120,42 @@ def display_recommendations(recommendations_df):
         st.markdown(f"""### Numéro d'exigence: {row["Numéro d'exigence"]}""")
         st.markdown(row["Recommandation"])
 
+# Fonction pour créer un fichier texte des recommandations
+def generate_text_file(recommendations_df):
+    text_content = ""
+    for index, row in recommendations_df.iterrows():
+        text_content += f"Numéro d'exigence: {row['Numéro d'exigence']}\n"
+        text_content += f"{row['Recommandation']}\n\n"
+    return text_content
+
+# Fonction pour créer un fichier DOCX des recommandations
+def generate_docx_file(recommendations_df):
+    doc = Document()
+    for index, row in recommendations_df.iterrows():
+        doc.add_heading(f"Numéro d'exigence: {row['Numéro d'exigence']}", level=2)
+        doc.add_paragraph(row['Recommandation'])
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# Fonction pour créer un fichier PDF des recommandations
+def generate_pdf_file(recommendations_df):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    for index, row in recommendations_df.iterrows():
+        pdf.set_font("Arial", style='B', size=14)
+        pdf.cell(200, 10, txt=f"Numéro d'exigence: {row['Numéro d'exigence']}", ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, txt=row['Recommandation'])
+        pdf.ln(10)
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return buffer
+
 # Fonction principale
 def main():
     add_css_styles()
@@ -133,8 +178,9 @@ def main():
             # Préparation d'une liste pour les recommandations
             recommendations = []
 
-            # Affichage d'un spinner pendant la génération des recommandations
+            # Affichage d'un spinner et d'un message d'attente pendant la génération des recommandations
             with st.spinner('Génération des recommandations en cours...'):
+                st.markdown('<p class="spinner-message">Veuillez patienter pendant que les recommandations sont générées...</p>', unsafe_allow_html=True)
                 for _, non_conformity in action_plan_df.iterrows():
                     prompt = generate_prompt(non_conformity, guide_df)
                     recommendation_text = generate_ai_recommendation(prompt, model)
@@ -150,11 +196,40 @@ def main():
                 recommendations_df = pd.DataFrame(recommendations)
                 st.subheader("Résumé des Recommandations")
                 display_recommendations(recommendations_df)
+
+                # Télécharger au format CSV
                 st.download_button(
-                    label="Télécharger les recommandations",
+                    label="Télécharger les recommandations (CSV)",
                     data=recommendations_df.to_csv(index=False),
                     file_name="recommandations_ifs_food.csv",
                     mime="text/csv",
+                )
+
+                # Télécharger au format texte
+                text_file = generate_text_file(recommendations_df)
+                st.download_button(
+                    label="Télécharger les recommandations (Texte)",
+                    data=text_file,
+                    file_name="recommandations_ifs_food.txt",
+                    mime="text/plain",
+                )
+
+                # Télécharger au format DOCX
+                docx_file = generate_docx_file(recommendations_df)
+                st.download_button(
+                    label="Télécharger les recommandations (DOCX)",
+                    data=docx_file,
+                    file_name="recommandations_ifs_food.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+
+                # Télécharger au format PDF
+                pdf_file = generate_pdf_file(recommendations_df)
+                st.download_button(
+                    label="Télécharger les recommandations (PDF)",
+                    data=pdf_file,
+                    file_name="recommandations_ifs_food.pdf",
+                    mime="application/pdf",
                 )
 
 if __name__ == "__main__":
