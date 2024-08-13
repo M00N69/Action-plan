@@ -108,7 +108,7 @@ def generate_ai_recommendation(prompt, model):
 # Fonction pour afficher les recommandations avec un rendu Markdown
 def display_recommendations(recommendations_df):
     for index, row in recommendations_df.iterrows():
-        st.markdown(f"### Numéro d'exigence: {row['Numéro d'exigence']}")
+        st.markdown(f"""### Numéro d'exigence: {row["Numéro d'exigence"]}""")
         st.markdown(row["Recommandation"])
 
 # Fonction principale
