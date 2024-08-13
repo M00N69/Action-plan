@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import time
 import google.generativeai as genai
 
 # Configurer la page de l'application
@@ -104,6 +105,12 @@ def generate_ai_recommendation(prompt, model):
         st.error(f"Erreur lors de la génération de la recommandation: {str(e)}")
         return None
 
+# Fonction pour afficher les recommandations avec un rendu Markdown
+def display_recommendations(recommendations_df):
+    for index, row in recommendations_df.iterrows():
+        st.markdown(f"### Numéro d'exigence: {row['Numéro d'exigence']}")
+        st.markdown(row['Recommandation'])
+
 # Fonction principale
 def main():
     add_css_styles()
@@ -123,20 +130,26 @@ def main():
             # Charger le guide IFSv8 depuis le CSV sur GitHub
             guide_df = pd.read_csv("https://raw.githubusercontent.com/M00N69/Action-plan/main/Guide%20Checklist_IFS%20Food%20V%208%20-%20CHECKLIST.csv")
 
-            # Générer et afficher les recommandations pour chaque non-conformité
+            # Préparation d'une liste pour les recommandations
             recommendations = []
-            for _, non_conformity in action_plan_df.iterrows():
-                prompt = generate_prompt(non_conformity, guide_df)
-                recommendation_text = generate_ai_recommendation(prompt, model)
-                if recommendation_text:
-                    recommendations.append({
-                        "Numéro d'exigence": non_conformity["Numéro d'exigence"],
-                        "Recommandation": recommendation_text
-                    })
+
+            # Affichage d'un spinner pendant la génération des recommandations
+            with st.spinner('Génération des recommandations en cours...'):
+                for _, non_conformity in action_plan_df.iterrows():
+                    prompt = generate_prompt(non_conformity, guide_df)
+                    recommendation_text = generate_ai_recommendation(prompt, model)
+                    if recommendation_text:
+                        recommendations.append({
+                            "Numéro d'exigence": non_conformity["Numéro d'exigence"],
+                            "Recommandation": recommendation_text
+                        })
+                    # Pause entre les requêtes pour éviter l'épuisement des ressources
+                    time.sleep(5)  # Attendre 5 secondes entre chaque requête
 
             if recommendations:
                 recommendations_df = pd.DataFrame(recommendations)
-                st.write(recommendations_df.to_html(classes='dataframe', index=False, escape=False), unsafe_allow_html=True)
+                st.subheader("Résumé des Recommandations")
+                display_recommendations(recommendations_df)
                 st.download_button(
                     label="Télécharger les recommandations",
                     data=recommendations_df.to_csv(index=False),
