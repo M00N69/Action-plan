@@ -104,15 +104,20 @@ def generate_prompt(non_conformity, guide_df):
     
     return prompt
 
-# Fonction pour générer une recommandation à partir de l'IA
+# Fonction pour générer une recommandation à partir de l'IA avec gestion d'erreurs de quota
 def generate_ai_recommendation(prompt, model):
     try:
         convo = model.start_chat(history=[{"role": "user", "parts": [prompt]}])
         response = convo.send_message(prompt)
         return response.text if response else None
     except Exception as e:
-        st.error(f"Erreur lors de la génération de la recommandation: {str(e)}")
-        return None
+        if "Resource has been exhausted" in str(e):
+            st.warning("Quota de l'API atteint. Attente de 60 secondes avant de réessayer...")
+            time.sleep(60)  # Attendre 60 secondes avant de réessayer
+            return generate_ai_recommendation(prompt, model)  # Réessayer la génération
+        else:
+            st.error(f"Erreur lors de la génération de la recommandation: {str(e)}")
+            return None
 
 # Fonction pour afficher les recommandations avec un rendu Markdown
 def display_recommendations(recommendations_df):
