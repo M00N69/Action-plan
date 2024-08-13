@@ -138,25 +138,28 @@ def parse_recommendation(text):
         st.error("La recommandation fournie par l'IA est mal structurée ou incomplète. Veuillez essayer à nouveau.")
     return rec
 
-def display_recommendation(recommendation, index, requirement_number):
-    if recommendation is None:
-        st.error("La recommandation n'a pas pu être générée. Veuillez réessayer.")
-        return
-
-    if not isinstance(recommendation, dict):
-        st.error("Erreur interne : La recommandation n'est pas dans le bon format.")
-        return
-
-    st.markdown(f'<div class="recommendation-container">', unsafe_allow_html=True)
-    st.markdown(f'<h2 class="recommendation-header">Recommandation pour la Non-conformité {index + 1} : Exigence {requirement_number}</h2>', unsafe_allow_html=True)
-
+def format_recommendation_text(recommendation):
+    formatted_text = ""
     for key, value in recommendation.items():
-        if value:
-            st.markdown(f'<div class="recommendation-content"><b>{key} :</b> {value}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="recommendation-content warning">Recommandation manquante pour {key}</div>', unsafe_allow_html=True)
+        formatted_text += f"**{key}** : {value}\n\n"
+    return formatted_text
 
-    st.markdown('</div>', unsafe_allow_html=True)
+def generate_summary_table(action_plan_df, model):
+    summary_data = []
+
+    for index, non_conformity in action_plan_df.iterrows():
+        raw_recommendation = generate_ai_recommendation(non_conformity, model)
+        if raw_recommendation:
+            recommendation = parse_recommendation(raw_recommendation)
+            summary_data.append({
+                "Numéro de non-conformité": index + 1,
+                "Numéro d'exigence": non_conformity["Numéro d'exigence"],
+                "Correction proposée": recommendation["Correction proposée"],
+                "Preuves potentielles": recommendation["Preuves potentielles"],
+                "Actions correctives": recommendation["Actions correctives"],
+            })
+
+    return pd.DataFrame(summary_data)
 
 def main():
     add_css_styles()
@@ -172,83 +175,18 @@ def main():
             st.markdown('<div class="dataframe-container">' + action_plan_df.to_html(classes='dataframe', index=False) + '</div>', unsafe_allow_html=True)
             model = configure_model()
 
-            if 'current_index' not in st.session_state:
-                st.session_state.current_index = 0
-                st.session_state.recommendations = []
-
-            st.markdown(f"**Non-conformité {st.session_state.current_index + 1} / {len(action_plan_df)}**")
-            progress_bar = st.progress(st.session_state.current_index / len(action_plan_df))
-
-            current_non_conformity = action_plan_df.iloc[st.session_state.current_index]
-            requirement_number = current_non_conformity["Numéro d'exigence"]
-            st.subheader(f"Non-conformité {st.session_state.current_index + 1} : Exigence {requirement_number}")
-
-            if 'current_recommendation' not in st.session_state:
-                if st.button("Obtenir Recommandation", key="get_recommendation"):
-                    raw_recommendation = generate_ai_recommendation(current_non_conformity, model)
-                    if raw_recommendation:
-                        recommendation = parse_recommendation(raw_recommendation)
-                        st.session_state.current_recommendation = recommendation
-                    else:
-                        st.session_state.current_recommendation = None
-
-            if 'current_recommendation' in st.session_state:
-                display_recommendation(st.session_state.current_recommendation, st.session_state.current_index, requirement_number)
-                
-                if st.session_state.current_index > 0:
-                    if st.button("Précédent", key="previous_recommendation"):
-                        st.session_state.current_index -= 1
-                        st.session_state.current_recommendation = None
-
-                if st.button("Nouvel essai", key="retry_recommendation"):
-                    del st.session_state['current_recommendation']
-                    raw_recommendation = generate_ai_recommendation(current_non_conformity, model)
-                    if raw_recommendation:
-                        recommendation = parse_recommendation(raw_recommendation)
-                        st.session_state.current_recommendation = recommendation
-                    else:
-                        st.session_state.current_recommendation = None
-                    display_recommendation(recommendation, st.session_state.current_index, requirement_number)
-                
-                if st.button("Accepter et Continuer", key="continue_to_next"):
-                    if st.session_state.current_recommendation and all(st.session_state.current_recommendation.values()):
-                        st.session_state.recommendations.append({
-                            "Numéro de non-conformité": st.session_state.current_index + 1,
-                            "Numéro d'exigence": current_non_conformity["Numéro d'exigence"],
-                            "Correction proposée": st.session_state.current_recommendation["Correction proposée"],
-                            "Preuves potentielles": st.session_state.current_recommendation["Preuves potentielles"],
-                            "Actions correctives": st.session_state.current_recommendation["Actions correctives"]
-                        })
-                        st.session_state.current_index += 1
-                        del st.session_state['current_recommendation']
-                        progress_bar.progress(st.session_state.current_index / len(action_plan_df))
-                        
-                        if st.session_state.current_index >= len(action_plan_df):
-                            st.markdown('<div class="success">Toutes les non-conformités ont été traitées. Vous pouvez maintenant télécharger toutes les recommandations.</div>', unsafe_allow_html=True)
-                            df_recommendations = pd.DataFrame(st.session_state.recommendations)
-                            st.write(df_recommendations.to_html(classes='dataframe', index=False), unsafe_allow_html=True)
-                            st.download_button(
-                                label="Télécharger les recommandations",
-                                data=df_recommendations.to_csv(index=False),
-                                file_name="recommandations_ifs_food.csv",
-                                mime="text/csv",
-                            )
-                        else:
-                            st.session_state.current_recommendation = None
-                            st.success("Recommandation acceptée. Passez à la non-conformité suivante.")
-                    else:
-                        st.warning("Certaines sections de la recommandation sont manquantes ou non générées. Veuillez essayer à nouveau.")
-
+            # Génération du tableau récapitulatif pour toutes les non-conformités
+            summary_df = generate_summary_table(action_plan_df, model)
+            
             st.subheader("Résumé des Recommandations")
-            if st.session_state.recommendations:
-                df_recommendations = pd.DataFrame(st.session_state.recommendations)
-                st.write(df_recommendations.to_html(classes='dataframe', index=False), unsafe_allow_html=True)
-                st.download_button(
-                    label="Télécharger les recommandations",
-                    data=df_recommendations.to_csv(index=False),
-                    file_name="recommandations_ifs_food.csv",
-                    mime="text/csv",
-                )
+            st.write(summary_df.to_html(classes='dataframe', index=False, escape=False), unsafe_allow_html=True)
+
+            st.download_button(
+                label="Télécharger les recommandations",
+                data=summary_df.to_csv(index=False),
+                file_name="recommandations_ifs_food.csv",
+                mime="text/csv",
+            )
 
 if __name__ == "__main__":
     main()
