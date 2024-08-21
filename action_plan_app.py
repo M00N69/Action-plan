@@ -228,14 +228,7 @@ def main():
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 )
 
-                # Télécharger au format PDF
-                pdf_file = generate_pdf_file(recommendations_df)
-                st.download_button(
-                    label="Télécharger les recommandations (PDF)",
-                    data=pdf_file,
-                    file_name="recommandations_ifs_food.pdf",
-                    mime="application/pdf",
-                )
+        
 
 if __name__ == "__main__":
     main()
