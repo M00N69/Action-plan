@@ -19,6 +19,7 @@ st.markdown(
     .dataframe-container {
         margin-bottom: 20px;
     }
+    /* Styles pour la bannière */
     .banner {
         background-image: url('https://github.com/M00N69/BUSCAR/blob/main/logo%2002%20copie.jpg?raw=true');
         background-size: cover;
@@ -26,8 +27,18 @@ st.markdown(
         background-position: center;
         margin-bottom: 20px;
     }
+    /* Styles personnalisés pour l'expander */
+    .st-emotion-cache-1h9usn1 {
+        background-color: #e0f7fa !important; /* Fond bleu clair pour l'expander */
+        border: 1px solid #004080 !important; /* Bordure bleu foncé */
+        border-radius: 5px;
+    }
+    .st-emotion-cache-p5msec {
+        color: #004080 !important; /* Couleur du texte de l'expander */
+    }
+    /* Styles personnalisés pour les boutons */
     div.stButton > button {
-        background-color: #004080;
+        background-color: #004080; /* Couleur de fond */
         color: white;
         border-radius: 5px;
         border: none;
@@ -36,11 +47,12 @@ st.markdown(
         margin-top: 10px;
     }
     div.stButton > button:hover {
-        background-color: #0066cc;
+        background-color: #0066cc; /* Couleur de fond au survol */
         color: white;
     }
     </style>
-    """, unsafe_allow_html=True
+    """,
+    unsafe_allow_html=True
 )
 
 # Ajouter la bannière
