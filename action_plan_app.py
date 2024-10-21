@@ -84,10 +84,10 @@ def generate_ai_recommendation_groq(non_conformity, guide_row):
 
     # Instructions affinées
     general_context = (
-        "En tant qu'expert en IFS Food 8, pour chaque non-conformité constatée lors d'un audit, veuillez fournir :\n"
-        "- une recommandation de correction : action immédiate visant à éliminer la non-conformité détectée.\n"
-        "- le type de preuve attendu : élément tangible démontrant la mise en place de la correction.\n"
-        "- l'analyse de la cause probable : investigation approfondie pour identifier l'origine de la non-conformité.\n"
+        "En tant qu'expert en IFS Food 8 et en technologies alimentaires, pour chaque non-conformité constatée lors d'un audit, veuillez fournir :\n"
+        "- une recommandation de correction : action immédiate visant à éliminer la non-conformité détectée en s'assurant qu'elle est adaptée au domaine d'activités du site industriel.\n"
+        "- le type de preuve attendu : élément tangible (photo, document,...) démontrant la mise en place de la correction.\n"
+        "- l'analyse de la cause probable : investigation approfondie pour identifier l'origine de la non-conformité en t'assurant que l'analyse est cohérente avec l'acvité du site  (industrie alimentaire).\n"
         "- une recommandation d'action corrective : mesure à prendre pour éliminer la cause racine et prévenir la réapparition de la non-conformité.\n\n"
         "Points importants à prendre en compte :\n"
         "- Distinction correction / action corrective : La correction est une action immédiate pour rectifier une situation, tandis que l'action corrective vise à éliminer la cause racine et à empêcher la récurrence.\n"
